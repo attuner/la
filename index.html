@@ -6,7 +6,7 @@
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <meta name="theme-color" content="#0d1117" />
-  <title>P2P Instant Stereo Radio v6</title>
+  <title>P2P Instant Stereo Radio v7</title>
   <style>
     :root {
       --bg: #0d1117;
@@ -152,23 +152,6 @@
       align-items: center;
     }
 
-    input[type="text"] {
-      flex: 1;
-      min-height: 48px;
-      background: #0d1117;
-      border: 1px solid var(--border);
-      border-radius: 8px;
-      padding: 0 14px;
-      color: var(--text-bright);
-      font-size: 0.95rem;
-      outline: none;
-      
-    }
-
-    input[type="text"]:focus {
-      border-color: #58a6ff;
-    }
-
     button {
       min-height: 48px;
       min-width: 48px;
@@ -309,15 +292,14 @@
   <!-- Broadcaster Deck -->
   <div class="card" id="broadcasterCard">
     <div class="group-label">
-      <span>Broadcast Transmitter</span>
+      <span>Broadcast Transmitter (<strong id="myStationLabel">Not Live</strong>)</span>
       <span id="listenerCountText" class="hidden">Listeners: <strong id="listenerCount">0</strong></span>
     </div>
     
     <div class="visualizer-container" id="visualizer"></div>
 
     <div id="broadcastPreStart" class="flex-row">
-      <input type="text" id="stationNameInput" placeholder="Station / Host Name" autocomplete="off" autocorrect="off" />
-      <button class="primary" id="startBroadcastBtn">Go Live</button>
+      <button class="primary" id="startBroadcastBtn" style="width: 100%;">Go Live (Instant Broadcast)</button>
     </div>
 
     <div id="broadcastControls" class="flex-row hidden" style="flex-wrap: wrap; margin-top: 8px;">
@@ -385,30 +367,40 @@
   let activeRole = null; // 'broadcaster' | 'listener'
   let targetBroadcaster = null;
   let isStereoHardware = false;
+  let hasNotifiedTuneIn = false; // Guard to guarantee tune_in single-fire
 
-  // Broadcaster Multi-Listener Pool
+  // Multi-Listener Pool & Listener Connection
   const broadcasterPeerConnections = {};
   let listenerPeerConnection = null;
 
+  // ICE Buffers for Batch Transmission: { [targetUser]: Candidate[] }
+  const iceCandidateBuffer = {};
+  let iceBatchTimer = null;
+
+  // Media & Hardware
   let localAudioStream = null;
   let audioContext = null;
   let analyserNode = null;
   let animFrameId = null;
   let lastSyncTimestamp = 0;
 
-  // Broadcaster states
+  // Dual-Layer Keep-Alive Oscillator & WakeLock
+  let keepAliveOscillator = null;
+  let wakeLockSentinel = null;
+
+  // Broadcaster State
   let isMicMuted = false;
   let isBroadcastPaused = false;
   let broadcasterRecorder = null;
   let broadcasterRecordedChunks = [];
 
-  // Listener states
+  // Listener State
   let isRemoteMuted = false;
   let isPlaybackPaused = false;
   let listenerRecorder = null;
   let listenerRecordedChunks = [];
 
-  // DOM Handles
+  // DOM Elements
   const statusDot = document.getElementById("statusDot");
   const statusText = document.getElementById("statusText");
   const channelBadge = document.getElementById("channelBadge");
@@ -417,12 +409,12 @@
   const remoteAudio = document.getElementById("remoteAudio");
   const silentKeepAlive = document.getElementById("silentKeepAlive");
   const visualizerContainer = document.getElementById("visualizer");
+  const myStationLabel = document.getElementById("myStationLabel");
 
   // Broadcaster DOM
   const broadcasterCard = document.getElementById("broadcasterCard");
   const broadcastPreStart = document.getElementById("broadcastPreStart");
   const broadcastControls = document.getElementById("broadcastControls");
-  const stationNameInput = document.getElementById("stationNameInput");
   const startBroadcastBtn = document.getElementById("startBroadcastBtn");
   const pauseBroadcastBtn = document.getElementById("pauseBroadcastBtn");
   const muteBtn = document.getElementById("muteBtn");
@@ -440,7 +432,7 @@
   const recordListenerBtn = document.getElementById("recordListenerBtn");
   const tuneOutBtn = document.getElementById("tuneOutBtn");
 
-  // Visualizer Bars Generation
+  // Build Visualizer UI
   const NUM_BARS = 24;
   const bars = [];
   for (let i = 0; i < NUM_BARS; i++) {
@@ -465,17 +457,59 @@
   }
 
   // ==========================================
-  // 1. BACKGROUND AUDIO RETENTION & KEEP-ALIVE
+  // 1. DUAL-LAYER KEEP-ALIVE & WAKELOCK STACK
   // ==========================================
+  async function requestScreenWakeLock() {
+    if ('wakeLock' in navigator) {
+      try {
+        wakeLockSentinel = await navigator.wakeLock.request('screen');
+      } catch (err) {
+        console.warn("WakeLock request skipped:", err);
+      }
+    }
+  }
+
+  document.addEventListener("visibilitychange", async () => {
+    if (document.visibilityState === 'visible' && (currentStationId)) {
+      if (wakeLockSentinel !== null) {
+        await requestScreenWakeLock();
+      }
+    }
+  });
+
   function activateKeepAlive(stationTitle) {
-    // Prime the silent loop inside user interaction context
+    // 1. HTML5 Silent Audio loop
     silentKeepAlive.play().catch(() => {});
 
+    // 2. Continuous Inaudible Tone via Web Audio Oscillator
+    try {
+      if (!audioContext) {
+        audioContext = new (window.AudioContext || window.webkitAudioContext)();
+      }
+      if (audioContext.state === "suspended") {
+        audioContext.resume();
+      }
+      if (!keepAliveOscillator) {
+        keepAliveOscillator = audioContext.createOscillator();
+        const silentGain = audioContext.createGain();
+        silentGain.gain.value = 0.0001; // Inaudible to human ear
+        keepAliveOscillator.connect(silentGain);
+        silentGain.connect(audioContext.destination);
+        keepAliveOscillator.start();
+      }
+    } catch (e) {
+      console.warn("Keep-alive oscillator skipped:", e);
+    }
+
+    // 3. Screen Wake Lock
+    requestScreenWakeLock();
+
+    // 4. MediaSession Daemon Registration
     if ('mediaSession' in navigator) {
       navigator.mediaSession.metadata = new MediaMetadata({
-        title: stationTitle ? stationTitle.replace('station_', '') : 'Live Broadcast',
+        title: stationTitle ? stationTitle.replace('station_', '') : 'Live Transmission',
         artist: 'P2P Voice Radio',
-        album: 'Live Stream'
+        album: 'Live Broadcast'
       });
       navigator.mediaSession.playbackState = 'playing';
       navigator.mediaSession.setActionHandler('play', () => {
@@ -496,14 +530,14 @@
   }
 
   // ==========================================
-  // 2. WEB WORKER BACKGROUND SIGNALING ENGINE
+  // 2. CONCURRENCY-LOCKED BACKGROUND WORKER
   // ==========================================
   const workerBlobCode = `
     let timer = null;
     self.onmessage = function(e) {
       if (e.data.action === 'start') {
         if (timer) clearInterval(timer);
-        timer = setInterval(() => self.postMessage({ type: 'tick' }), e.data.interval || 800);
+        timer = setInterval(() => self.postMessage({ type: 'tick' }), e.data.interval || 1200);
       } else if (e.data.action === 'stop') {
         if (timer) clearInterval(timer);
         timer = null;
@@ -526,7 +560,7 @@
     signalingWorker.postMessage({ action: 'stop' });
   }
 
-  // Signaling Fetch Client
+  // Network Fetch Client
   async function apiCall(action, payload = {}, retries = 2) {
     const body = { action, username: currentUser, ...payload };
     const formData = new URLSearchParams();
@@ -541,7 +575,7 @@
     for (let attempt = 0; attempt <= retries; attempt++) {
       try {
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 6000);
+        const timeoutId = setTimeout(() => controller.abort(), 7000);
 
         const res = await fetch(GAS_SIGNALING_URL, {
           method: "POST",
@@ -556,12 +590,40 @@
         if (attempt === retries) {
           return { status: "error", message: err.toString() };
         }
-        await new Promise(r => setTimeout(r, 300));
+        await new Promise(r => setTimeout(r, 400));
       }
     }
   }
 
-  // Safe Safari SDP Opus Stereo Inserter
+  // ICE Candidate Local Buffer & Batch Dispatcher
+  function queueIceCandidate(targetUser, candidate) {
+    if (!iceCandidateBuffer[targetUser]) {
+      iceCandidateBuffer[targetUser] = [];
+    }
+    iceCandidateBuffer[targetUser].push(candidate);
+
+    if (!iceBatchTimer) {
+      iceBatchTimer = setTimeout(flushIceCandidateBuffers, 400); // 400ms aggregation
+    }
+  }
+
+  async function flushIceCandidateBuffers() {
+    iceBatchTimer = null;
+    const targets = Object.keys(iceCandidateBuffer);
+    for (const target of targets) {
+      const candidates = iceCandidateBuffer[target];
+      if (candidates && candidates.length > 0) {
+        delete iceCandidateBuffer[target];
+        await apiCall("post_ice_batch", {
+          stationId: currentStationId,
+          toUser: target,
+          candidates: candidates
+        });
+      }
+    }
+  }
+
+  // Safe Safari SDP Stereo Modifier
   function safelyInjectStereoSDP(sdp) {
     try {
       const match = sdp.match(/a=rtpmap:(\d+)\s+opus\/48000\/2/i);
@@ -579,12 +641,11 @@
         return sdp.replace(match[0] + '\r\n', `${match[0]}\r\na=fmtp:${pt} stereo=1;sprop-stereo=1;maxaveragebitrate=128000\r\n`);
       }
     } catch (e) {
-      console.warn("SDP stereo injection skipped:", e);
       return sdp;
     }
   }
 
-  // Audio Context & Hardware Capture
+  // Visualizer Pipeline with Tab Visibility Throttling
   function initVisualizer(stream) {
     if (!audioContext) {
       audioContext = new (window.AudioContext || window.webkitAudioContext)();
@@ -599,6 +660,11 @@
 
     const dataArray = new Uint8Array(analyserNode.frequencyBinCount);
     function render() {
+      // Throttle completely if window is hidden to prevent main-thread freeze
+      if (document.hidden) {
+        animFrameId = requestAnimationFrame(render);
+        return;
+      }
       analyserNode.getByteFrequencyData(dataArray);
       for (let i = 0; i < NUM_BARS; i++) {
         const val = dataArray[i] || 0;
@@ -613,7 +679,6 @@
   async function captureMicrophone() {
     if (!localAudioStream) {
       try {
-        // Attempt dual-channel stereo capture
         localAudioStream = await navigator.mediaDevices.getUserMedia({
           audio: {
             channelCount: 2,
@@ -624,13 +689,8 @@
           video: false
         });
       } catch (e) {
-        // Graceful fallback for Safari / mobile mono hardware
         localAudioStream = await navigator.mediaDevices.getUserMedia({
-          audio: {
-            echoCancellation: true,
-            noiseSuppression: true,
-            autoGainControl: true
-          },
+          audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
           video: false
         });
       }
@@ -645,17 +705,11 @@
   }
 
   // ==========================================
-  // 3. BROADCASTER ACTIONS
+  // 3. INSTANT BROADCAST (No Modal / No Prompt)
   // ==========================================
   startBroadcastBtn.onclick = async () => {
-    let stationName = stationNameInput.value.trim();
-    if (!stationName) {
-      stationName = prompt("Enter Station / Broadcaster Name:") || "";
-      stationName = stationName.trim();
-      if (!stationName) return;
-    }
-
     startBroadcastBtn.disabled = true;
+
     try {
       await captureMicrophone();
     } catch (e) {
@@ -663,10 +717,12 @@
       return alert("Microphone access failed: " + e.message);
     }
 
-    activateKeepAlive(stationName);
-
-    currentStationId = "station_" + stationName.replace(/[^a-zA-Z0-9_-]/g, '_');
+    // Derive stationId immediately from persistent session user identity
+    currentStationId = "station_" + currentUser;
     activeRole = "broadcaster";
+    myStationLabel.innerText = currentUser;
+
+    activateKeepAlive(currentStationId);
 
     broadcastPreStart.classList.add("hidden");
     broadcastControls.classList.remove("hidden");
@@ -678,7 +734,7 @@
       alert("Unable to register station: " + res.message);
       return resetSessionState();
     }
-    startSignalingWorker(800);
+    startSignalingWorker(1200); // Safe minimum polling threshold
   };
 
   pauseBroadcastBtn.onclick = async () => {
@@ -743,7 +799,6 @@
     const pc = new RTCPeerConnection(RTC_CONFIG);
     broadcasterPeerConnections[listenerUser] = pc;
 
-    // Explicit transceiver configuration for Safari/WebKit compatibility
     if (localAudioStream) {
       localAudioStream.getTracks().forEach(track => {
         pc.addTransceiver(track, { direction: 'sendonly', streams: [localAudioStream] });
@@ -751,9 +806,8 @@
     }
 
     pc.onicecandidate = (event) => {
-      // Validate candidate to filter empty end-of-candidate payloads
       if (event.candidate && event.candidate.candidate) {
-        apiCall("post_ice", { stationId: currentStationId, toUser: listenerUser, payload: event.candidate });
+        queueIceCandidate(listenerUser, event.candidate);
       }
     };
 
@@ -775,7 +829,6 @@
       await pc.setLocalDescription(testDesc);
       finalOffer = testDesc;
     } catch (e) {
-      console.warn("Safari rejected mutated SDP; falling back to raw offer:", e);
       await pc.setLocalDescription(rawOffer);
       finalOffer = rawOffer;
     }
@@ -792,7 +845,7 @@
   }
 
   // ==========================================
-  // 4. LISTENER ACTIONS & TUNE-IN
+  // 4. LISTENER ACTIONS & INSTANT TUNE-IN
   // ==========================================
   async function fetchStations() {
     refreshStationsBtn.disabled = true;
@@ -830,7 +883,7 @@
   refreshStationsBtn.onclick = fetchStations;
 
   window.tuneIntoStation = async (stationId, broadcaster, isStereo) => {
-    // Immediate audio engine unlock for Safari & Chrome
+    // Unlock Web Audio and Remote Playback
     if (!audioContext) {
       audioContext = new (window.AudioContext || window.webkitAudioContext)();
     }
@@ -851,21 +904,25 @@
     setChannelBadge(isStereo);
     setStatus("signaling", "Tuning in...");
 
-    const res = await apiCall("tune_in", { stationId: currentStationId });
-    if (!res || res.status !== "success") {
-      alert("Tune-in failed: " + (res ? res.message : "Network error"));
-      return resetSessionState();
+    // Guaranteed single-fire presence registration
+    if (!hasNotifiedTuneIn) {
+      hasNotifiedTuneIn = true;
+      const res = await apiCall("tune_in", { stationId: currentStationId });
+      if (!res || res.status !== "success") {
+        hasNotifiedTuneIn = false;
+        alert("Tune-in failed: " + (res ? res.message : "Network error"));
+        return resetSessionState();
+      }
     }
 
     setupListenerPeerConnection(broadcaster);
-    startSignalingWorker(800);
+    startSignalingWorker(1200); // 1.2s initial handshake rate
   };
 
   function setupListenerPeerConnection(broadcaster) {
     if (listenerPeerConnection) listenerPeerConnection.close();
     listenerPeerConnection = new RTCPeerConnection(RTC_CONFIG);
 
-    // Explicit recvonly transceiver declaration for Unified-Plan
     listenerPeerConnection.addTransceiver('audio', { direction: 'recvonly' });
 
     listenerPeerConnection.ontrack = (event) => {
@@ -878,7 +935,7 @@
 
     listenerPeerConnection.onicecandidate = (event) => {
       if (event.candidate && event.candidate.candidate) {
-        apiCall("post_ice", { stationId: currentStationId, toUser: broadcaster, payload: event.candidate });
+        queueIceCandidate(broadcaster, event.candidate);
       }
     };
 
@@ -887,7 +944,8 @@
       if (st === "checking") setStatus("connecting", "Connecting...");
       if (st === "connected" || st === "completed") {
         setStatus("live", "Tuned In");
-        startSignalingWorker(2000); // Connection established, throttle worker
+        // Connection settled: throttle worker down to conserve network/main-thread
+        startSignalingWorker(4000);
       }
       if (["disconnected", "failed", "closed"].includes(st)) {
         setStatus("", "Disconnected");
@@ -945,12 +1003,13 @@
   };
 
   // ==========================================
-  // 5. ASYNC SIGNALING LOOP (Invoked by Worker)
+  // 5. CONCURRENCY-LOCKED ASYNC SIGNALING LOOP
   // ==========================================
-  let isExecutingCycle = false;
+  let isPollingInProgress = false; // Strict Lockout Guard
+
   async function executePollCycle() {
-    if (!currentStationId || isExecutingCycle) return;
-    isExecutingCycle = true;
+    if (!currentStationId || isPollingInProgress) return;
+    isPollingInProgress = true;
 
     try {
       const res = await apiCall("poll_signaling", { stationId: currentStationId, since: lastSyncTimestamp });
@@ -1033,7 +1092,7 @@
     } catch (err) {
       console.warn("Poll cycle exception:", err);
     } finally {
-      isExecutingCycle = false;
+      isPollingInProgress = false;
     }
   }
 
@@ -1044,7 +1103,24 @@
   async function resetSessionState() {
     stopSignalingWorker();
     if (animFrameId) cancelAnimationFrame(animFrameId);
-    isExecutingCycle = false;
+    isPollingInProgress = false;
+    hasNotifiedTuneIn = false;
+
+    // Flush any remaining ICE buffers
+    if (iceBatchTimer) clearTimeout(iceBatchTimer);
+    iceBatchTimer = null;
+
+    // Release WakeLock
+    if (wakeLockSentinel !== null) {
+      try { await wakeLockSentinel.release(); } catch (e) {}
+      wakeLockSentinel = null;
+    }
+
+    // Terminate inaudible keep-alive oscillator
+    if (keepAliveOscillator) {
+      try { keepAliveOscillator.stop(); } catch (e) {}
+      keepAliveOscillator = null;
+    }
 
     silentKeepAlive.pause();
     silentKeepAlive.currentTime = 0;
@@ -1082,6 +1158,7 @@
     listenerCountText.classList.add("hidden");
     listenerCard.classList.add("hidden");
     startBroadcastBtn.disabled = false;
+    myStationLabel.innerText = "Not Live";
 
     pauseBroadcastBtn.innerText = "Pause";
     pauseBroadcastBtn.className = "";
