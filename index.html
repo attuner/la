@@ -2,1302 +2,638 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>P2P Voice Switchboard - Desktop Edition</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <title>CloudRadio — Live Web Audio</title>
   <style>
     :root {
-      --bg: #0b0e14;
-      --panel: #151921;
-      --panel-hover: #1c222d;
-      --border: #262c36;
-      --border-focus: #58a6ff;
-      --accent: #238636;
-      --accent-hover: #2ea043;
-      --danger: #da3633;
-      --danger-hover: #f85149;
-      --warn: #d29922;
-      --text: #c9d1d9;
-      --text-bright: #ffffff;
-      --muted: #8b949e;
-      --stereo: #a371f7;
+      --bg: #090b10;
+      --card-bg: rgba(22, 27, 34, 0.7);
+      --border: rgba(255, 255, 255, 0.1);
+      --primary: #00f2fe;
+      --accent: #4facfe;
+      --live: #ff0844;
+      --text: #f0f6fc;
+      --text-muted: #8b949e;
+      --radius: 16px;
     }
 
-    * {
-      box-sizing: border-box;
-      margin: 0;
-      padding: 0;
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-    }
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
 
     body {
-      background: var(--bg);
+      background-color: var(--bg);
+      background-image: radial-gradient(circle at 50% 0%, #1a233a 0%, var(--bg) 75%);
       color: var(--text);
       min-height: 100vh;
       display: flex;
       flex-direction: column;
       align-items: center;
-      padding: 24px;
+      padding: 24px 16px;
     }
 
-    .app-wrapper {
-      width: 100%;
-      max-width: 1100px;
-      display: flex;
-      flex-direction: column;
-      gap: 20px;
-    }
-
-    /* Desktop Navigation / Header */
     header {
-      background: var(--panel);
-      border: 1px solid var(--border);
-      border-radius: 12px;
-      padding: 16px 24px;
+      width: 100%;
+      max-width: 600px;
       display: flex;
       justify-content: space-between;
       align-items: center;
-      box-shadow: 0 4px 16px rgba(0,0,0,0.3);
+      margin-bottom: 24px;
     }
 
-    .brand-group {
-      display: flex;
-      align-items: center;
-      gap: 12px;
-    }
-
-    h1 {
-      font-size: 1.25rem;
-      font-weight: 700;
-      color: var(--text-bright);
-      letter-spacing: -0.02em;
-    }
-
-    .system-status {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-    }
+    .brand { font-size: 1.25rem; font-weight: 700; letter-spacing: -0.5px; display: flex; align-items: center; gap: 8px; }
+    .brand-dot { width: 10px; height: 10px; border-radius: 50%; background: var(--primary); box-shadow: 0 0 10px var(--primary); }
 
     .status-badge {
-      display: flex;
+      display: inline-flex;
       align-items: center;
       gap: 6px;
+      padding: 6px 14px;
+      border-radius: 20px;
       font-size: 0.75rem;
+      font-weight: 700;
       text-transform: uppercase;
-      font-weight: 700;
-      padding: 6px 12px;
-      border-radius: 999px;
-      background: #0d1117;
+      letter-spacing: 0.5px;
+      background: rgba(255, 255, 255, 0.05);
       border: 1px solid var(--border);
     }
+    .status-badge.live { background: rgba(255, 8, 68, 0.15); border-color: var(--live); color: var(--live); }
+    .status-badge.live::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--live); box-shadow: 0 0 8px var(--live); animation: pulse 1.5s infinite; }
 
-    .channel-badge {
-      font-size: 0.72rem;
-      font-weight: 700;
-      padding: 6px 10px;
-      border-radius: 6px;
-      background: #0d1117;
-      border: 1px solid var(--border);
-      color: var(--muted);
-    }
-
-    .channel-badge.stereo {
-      background: #231938;
-      border-color: var(--stereo);
-      color: var(--stereo);
-    }
-
-    .dot {
-      width: 8px;
-      height: 8px;
-      border-radius: 50%;
-      background: #484f58;
-    }
-
-    .dot.signaling {
-      background: var(--warn);
-      animation: pulse 0.5s infinite alternate;
-    }
-
-    .dot.live {
-      background: #3fb950;
-      box-shadow: 0 0 8px #3fb950;
-    }
-
-    .dot.paused {
-      background: var(--warn);
-    }
-
-    @keyframes pulse {
-      from { opacity: 0.3; }
-      to { opacity: 1; }
-    }
-
-    /* Dual-Pane Desktop Layout */
-    .dashboard-grid {
-      display: grid;
-      grid-template-columns: 1.2fr 0.8fr;
-      gap: 20px;
-      align-items: start;
-    }
-
-    @media (max-width: 860px) {
-      .dashboard-grid {
-        grid-template-columns: 1fr;
-      }
-    }
+    @keyframes pulse { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: 0.4; transform: scale(0.85); } }
 
     .card {
-      background: var(--panel);
-      border: 1px solid var(--border);
-      border-radius: 12px;
-      padding: 24px;
-      box-shadow: 0 4px 20px rgba(0,0,0,0.4);
-    }
-
-    .card-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      margin-bottom: 16px;
-      border-bottom: 1px solid var(--border);
-      padding-bottom: 12px;
-    }
-
-    .card-title {
-      font-size: 0.85rem;
-      text-transform: uppercase;
-      letter-spacing: 0.05em;
-      font-weight: 700;
-      color: var(--muted);
-    }
-
-    /* Visualizer (Expanded for Desktop) */
-    .visualizer-container {
-      height: 64px;
       width: 100%;
-      display: flex;
-      align-items: flex-end;
-      gap: 4px;
+      max-width: 600px;
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      padding: 24px;
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
       margin-bottom: 20px;
-      background: #090c10;
-      padding: 8px;
-      border-radius: 8px;
-      border: 1px solid var(--border);
     }
 
-    .visualizer-bar {
-      flex: 1;
-      background: #238636;
-      min-height: 3px;
-      height: 3px;
-      border-radius: 2px;
-      transition: height 0.04s ease;
-    }
+    .topic-display { margin-bottom: 20px; text-align: center; }
+    .topic-title { font-size: 1.4rem; font-weight: 700; margin-bottom: 6px; }
+    .topic-sub { font-size: 0.85rem; color: var(--text-muted); }
 
-    /* Action Buttons & Desktop Controls */
-    .control-row {
+    /* Canvas Visualizer */
+    .vis-container {
+      width: 100%;
+      height: 90px;
       display: flex;
-      gap: 10px;
-      flex-wrap: wrap;
+      align-items: center;
+      justify-content: center;
+      margin: 16px 0;
     }
+    canvas { width: 100%; height: 100%; border-radius: 8px; }
 
-    button {
-      background: #21262d;
-      border: 1px solid var(--border);
-      color: var(--text-bright);
-      padding: 10px 18px;
-      border-radius: 8px;
-      font-size: 0.88rem;
+    /* Buttons */
+    .btn {
+      width: 100%;
+      min-height: 52px;
+      border-radius: 26px;
+      border: none;
+      font-size: 1rem;
       font-weight: 600;
       cursor: pointer;
       display: inline-flex;
       align-items: center;
       justify-content: center;
-      gap: 8px;
-      transition: background 0.15s ease, border-color 0.15s ease;
+      gap: 10px;
+      transition: all 0.2s ease;
+      touch-action: manipulation;
+    }
+    .btn-primary {
+      background: linear-gradient(135deg, var(--accent) 0%, var(--primary) 100%);
+      color: #050505;
+      box-shadow: 0 4px 20px rgba(0, 242, 254, 0.3);
+    }
+    .btn-primary:active { transform: scale(0.98); }
+    .btn-danger { background: var(--live); color: white; }
+
+    /* Volume Slider */
+    .volume-box { display: flex; align-items: center; gap: 12px; margin-top: 20px; }
+    .volume-box input[type=range] {
+      flex: 1;
+      accent-color: var(--primary);
+      height: 6px;
+      cursor: pointer;
+    }
+
+    /* Shoutouts Chat Area */
+    .shoutout-card { display: flex; flex-direction: column; height: 320px; }
+    .shoutout-list { flex: 1; overflow-y: auto; padding-right: 6px; display: flex; flex-direction: column; gap: 10px; }
+    .shoutout-item { background: rgba(255, 255, 255, 0.03); padding: 8px 12px; border-radius: 8px; font-size: 0.85rem; }
+    .shoutout-meta { font-size: 0.75rem; color: var(--accent); font-weight: 600; margin-bottom: 2px; }
+    .shoutout-form { display: flex; gap: 8px; margin-top: 14px; }
+    .shoutout-form input {
+      background: rgba(0,0,0,0.3);
+      border: 1px solid var(--border);
+      color: #fff;
+      padding: 10px 14px;
+      border-radius: 8px;
+      font-size: 0.9rem;
       outline: none;
     }
+    .shoutout-form input:focus { border-color: var(--primary); }
 
-    button:focus-visible {
-      border-color: var(--border-focus);
-      box-shadow: 0 0 0 3px rgba(88, 166, 255, 0.3);
+    /* Broadcaster Section */
+    #broadcasterPanel {
+      border: 1px solid rgba(255, 8, 68, 0.3);
+      display: none;
     }
+    .admin-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; }
+    .admin-title { font-size: 0.9rem; font-weight: 700; color: var(--live); text-transform: uppercase; }
 
-    button:hover:not(:disabled) {
-      background: var(--panel-hover);
-      border-color: var(--muted);
-    }
-
-    button.primary {
-      background: var(--accent);
-      border-color: rgba(255,255,255,0.1);
-    }
-
-    button.primary:hover:not(:disabled) {
-      background: var(--accent-hover);
-    }
-
-    button.danger {
-      background: var(--danger);
-      border-color: rgba(255,255,255,0.1);
-    }
-
-    button.danger:hover:not(:disabled) {
-      background: var(--danger-hover);
-    }
-
-    button.recording {
-      background: #b62324;
-      border-color: #ff7b72;
-      animation: pulse 0.8s infinite alternate;
-    }
-
-    button:disabled {
-      opacity: 0.4;
-      cursor: not-allowed;
-    }
-
-    /* Station List Table / View */
-    .item-list {
-      list-style: none;
-      display: flex;
-      flex-direction: column;
-      gap: 8px;
-      max-height: 480px;
-      overflow-y: auto;
-    }
-
-    .item-list li {
-      background: #0d1117;
+    .text-field {
+      width: 100%;
+      background: rgba(0,0,0,0.3);
       border: 1px solid var(--border);
+      color: #fff;
+      padding: 10px 14px;
       border-radius: 8px;
-      padding: 12px 16px;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      transition: border-color 0.15s ease;
-    }
-
-    .item-list li:hover {
-      border-color: var(--muted);
-    }
-
-    .station-info {
-      display: flex;
-      flex-direction: column;
-      gap: 4px;
-    }
-
-    .station-name {
-      font-weight: 600;
-      color: var(--text-bright);
-      font-size: 0.95rem;
-    }
-
-    .badge {
-      background: #21262d;
-      border: 1px solid var(--border);
-      padding: 3px 6px;
-      border-radius: 4px;
-      font-size: 0.72rem;
-      font-weight: 700;
-      color: var(--muted);
-      display: inline-block;
-      width: fit-content;
-    }
-
-    .badge.live {
-      color: #3fb950;
-      border-color: #238636;
-    }
-
-    .badge.paused {
-      color: var(--warn);
-      border-color: var(--warn);
-    }
-
-    .hidden {
-      display: none !important;
-    }
-
-    .empty-message {
-      color: var(--muted);
-      font-size: 0.88rem;
-      padding: 24px 0;
-      text-align: center;
+      margin-bottom: 12px;
+      outline: none;
     }
   </style>
 </head>
 <body>
 
-<div class="app-wrapper">
-  <!-- Desktop Header -->
   <header>
-    <div class="brand-group">
-      <h1>P2P Voice Switchboard</h1>
-      <span class="badge" id="myIdentityBadge">ID: Initializing...</span>
-    </div>
-    <div class="system-status">
-      <span class="channel-badge" id="channelBadge">MONO (1-CH)</span>
-      <div class="status-badge">
-        <span class="dot" id="statusDot"></span>
-        <span id="statusText">Idle</span>
-      </div>
-    </div>
+    <div class="brand"><div class="brand-dot"></div>CloudRadio</div>
+    <div id="liveBadge" class="status-badge">Checking...</div>
   </header>
 
-  <div class="dashboard-grid">
-    <!-- LEFT PANEL: Active Station Console / Transmitter -->
-    <section class="left-panel">
-      <!-- Broadcaster Deck -->
-      <div class="card" id="broadcasterCard">
-        <div class="card-header">
-          <span class="card-title">Transmitter Station (<strong id="myStationLabel">Off-Air</strong>)</span>
-          <span id="listenerCountText" class="hidden">Listeners: <strong id="listenerCount">0</strong></span>
-        </div>
+  <!-- Broadcaster Control Panel -->
+  <section id="broadcasterPanel" class="card">
+    <div class="admin-header">
+      <span class="admin-title">Broadcaster Console</span>
+      <span id="activePeersCounter" style="font-size: 0.8rem; color: var(--text-muted);">0 Listeners</span>
+    </div>
+    <input type="text" id="streamTopicInput" class="text-field" placeholder="Broadcast Title / Topic..." />
+    <button id="broadcastToggleBtn" class="btn btn-primary" onclick="toggleBroadcasting()">Go Live (Start Mic)</button>
+    <div class="vis-container">
+      <canvas id="hostVisualizer"></canvas>
+    </div>
+  </section>
 
-        <div class="visualizer-container" id="visualizer"></div>
+  <!-- Public Listener Interface -->
+  <main class="card">
+    <div class="topic-display">
+      <h1 id="streamTopic" class="topic-title">Connecting to Station...</h1>
+      <p id="streamStatusDesc" class="topic-sub">Looking up live signals</p>
+    </div>
 
-        <div id="broadcastPreStart">
-          <button class="primary" id="startBroadcastBtn" style="width: 100%; height: 48px;">
-            Go Live (Instant Broadcast)
-          </button>
-        </div>
+    <div class="vis-container">
+      <canvas id="listenerVisualizer"></canvas>
+    </div>
 
-        <div id="broadcastControls" class="control-row hidden">
-          <button id="pauseBroadcastBtn" style="flex: 1;">Pause Broadcast</button>
-          <button id="muteBtn" style="flex: 1;">Mute Microphone</button>
-          <button id="recordBroadcasterBtn" style="flex: 1;">Record Audio</button>
-          <button id="stopSessionBtn" class="danger" style="flex: 1;">Stop Station</button>
-        </div>
-      </div>
+    <button id="listenBtn" class="btn btn-primary" onclick="toggleListening()">Tune In (Listen Live)</button>
 
-      <!-- Listener Deck -->
-      <div class="card hidden" id="listenerCard" style="margin-top: 20px;">
-        <div class="card-header">
-          <span class="card-title">Tuned In: <strong id="currentStationTitle">Station</strong></span>
-          <span class="badge live" id="stationStateBadge">LIVE</span>
-        </div>
+    <div class="volume-box">
+      <span style="font-size: 0.8rem; color: var(--text-muted);">🔊</span>
+      <input type="range" id="volumeControl" min="0" max="1" step="0.01" value="0.9" oninput="adjustVolume(this.value)" />
+    </div>
+  </main>
 
-        <div class="control-row">
-          <button class="primary" id="listenerPlayPauseBtn" style="flex: 1;">Pause</button>
-          <button id="listenerMuteBtn" style="flex: 1;">Mute</button>
-          <button id="recordListenerBtn" style="flex: 1;">Record Stream</button>
-          <button class="danger" id="tuneOutBtn" style="flex: 1;">Tune Out</button>
-        </div>
-      </div>
-    </section>
+  <!-- Shoutouts Feed -->
+  <section class="card shoutout-card">
+    <div class="shoutout-list" id="shoutoutFeed"></div>
+    <form class="shoutout-form" onsubmit="handleSendShoutout(event)">
+      <input type="text" id="shoutoutName" placeholder="Your Name" style="width: 30%;" required maxlength="20" />
+      <input type="text" id="shoutoutMsg" placeholder="Message or question..." style="flex: 1;" required maxlength="140" />
+      <button class="btn btn-primary" style="min-height: auto; width: 60px; border-radius: 8px;">Send</button>
+    </form>
+  </section>
 
-    <!-- RIGHT PANEL: Live Directory -->
-    <section class="right-panel">
-      <div class="card">
-        <div class="card-header">
-          <span class="card-title">Live Stations Directory</span>
-          <button id="refreshStationsBtn" style="padding: 6px 12px; font-size: 0.78rem;">Refresh List</button>
-        </div>
-        <ul class="item-list" id="stationList">
-          <li class="empty-message">Scanning radio frequencies...</li>
-        </ul>
-      </div>
-    </section>
-  </div>
-</div>
+  <audio id="remoteAudioElement" autoplay playsinline style="display: none;"></audio>
 
-<!-- Primary Audio Playback Pipeline -->
-<audio id="remoteAudio" autoplay playsinline></audio>
-
-<!-- Background Silent Loop Pipeline -->
-<audio id="silentKeepAlive" loop playsinline src="data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQAAAAA="></audio>
-
-<script>
-  /**
-   * CONFIGURATION
-   * Paste your published Google Apps Script Web App URL below:
-   */
-  const GAS_SIGNALING_URL = "https://script.google.com/macros/s/AKfycbwyswXBG9YtwgJ4b7TGD9VKJTThJwCg7Yefws6Sz5SFmGWD4Q9d2t8txxfEstY_TQTV/exec";
-
-  const RTC_CONFIG = {
-    iceServers: [
-      { urls: "stun:stun.l.google.com:19302" },
-      { urls: "stun:stun1.l.google.com:19302" }
-    ]
-  };
-
-  // Persistent Client Identity
-  let currentUser = localStorage.getItem("p2p_desktop_user");
-  if (!currentUser) {
-    currentUser = "desk_" + Math.random().toString(36).substring(2, 8);
-    localStorage.setItem("p2p_desktop_user", currentUser);
-  }
-
-  // Session State
-  let currentStationId = null;
-  let activeRole = null; // 'broadcaster' | 'listener'
-  let targetBroadcaster = null;
-  let isStereoHardware = false;
-  let hasNotifiedTuneIn = false;
-
-  // WebRTC Pools
-  const broadcasterPeerConnections = {};
-  let listenerPeerConnection = null;
-
-  // Batched ICE Buffer
-  const iceCandidateBuffer = {};
-  let iceBatchTimer = null;
-
-  // Unified Single AudioContext Instance
-  let sharedAudioContext = null;
-  let localAudioStream = null;
-  let analyserNode = null;
-  let visualizerSourceNode = null;
-  let animFrameId = null;
-  let lastSyncTimestamp = 0;
-
-  // Keep-Alive & WakeLock
-  let keepAliveOscillator = null;
-  let wakeLockSentinel = null;
-
-  // Broadcaster State
-  let isMicMuted = false;
-  let isBroadcastPaused = false;
-  let broadcasterRecorder = null;
-  let broadcasterRecordedChunks = [];
-
-  // Listener State
-  let isRemoteMuted = false;
-  let isPlaybackPaused = false;
-  let listenerRecorder = null;
-  let listenerRecordedChunks = [];
-
-  // Adaptive Worker Interval
-  let targetPollInterval = 1200;
-
-  // DOM Handles
-  const statusDot = document.getElementById("statusDot");
-  const statusText = document.getElementById("statusText");
-  const channelBadge = document.getElementById("channelBadge");
-  const myIdentityBadge = document.getElementById("myIdentityBadge");
-  const myStationLabel = document.getElementById("myStationLabel");
-  const stationList = document.getElementById("stationList");
-  const refreshStationsBtn = document.getElementById("refreshStationsBtn");
-  const remoteAudio = document.getElementById("remoteAudio");
-  const silentKeepAlive = document.getElementById("silentKeepAlive");
-  const visualizerContainer = document.getElementById("visualizer");
-
-  // Broadcaster Handles
-  const broadcasterCard = document.getElementById("broadcasterCard");
-  const broadcastPreStart = document.getElementById("broadcastPreStart");
-  const broadcastControls = document.getElementById("broadcastControls");
-  const startBroadcastBtn = document.getElementById("startBroadcastBtn");
-  const pauseBroadcastBtn = document.getElementById("pauseBroadcastBtn");
-  const muteBtn = document.getElementById("muteBtn");
-  const recordBroadcasterBtn = document.getElementById("recordBroadcasterBtn");
-  const stopSessionBtn = document.getElementById("stopSessionBtn");
-  const listenerCountText = document.getElementById("listenerCountText");
-  const listenerCountDisplay = document.getElementById("listenerCount");
-
-  // Listener Handles
-  const listenerCard = document.getElementById("listenerCard");
-  const currentStationTitle = document.getElementById("currentStationTitle");
-  const stationStateBadge = document.getElementById("stationStateBadge");
-  const listenerPlayPauseBtn = document.getElementById("listenerPlayPauseBtn");
-  const listenerMuteBtn = document.getElementById("listenerMuteBtn");
-  const recordListenerBtn = document.getElementById("recordListenerBtn");
-  const tuneOutBtn = document.getElementById("tuneOutBtn");
-
-  // Setup Visualizer Bars (Desktop Expanded: 36 Bars)
-  const NUM_BARS = 36;
-  const bars = [];
-  for (let i = 0; i < NUM_BARS; i++) {
-    const b = document.createElement("div");
-    b.className = "visualizer-bar";
-    visualizerContainer.appendChild(b);
-    bars.push(b);
-  }
-
-  // Initialize UI Identifiers
-  myIdentityBadge.innerText = `ID: ${currentUser}`;
-
-  function setStatus(state, text) {
-    statusDot.className = "dot " + state;
-    statusText.innerText = text;
-  }
-
-  function setChannelBadge(isStereo) {
-    channelBadge.innerText = isStereo ? "STEREO (2-CH)" : "MONO (1-CH)";
-    if (isStereo) {
-      channelBadge.classList.add("stereo");
-    } else {
-      channelBadge.classList.remove("stereo");
-    }
-  }
-
-  // ==========================================
-  // UNIFIED AUDIO CONTEXT LIFECYCLE
-  // ==========================================
-  function getOrCreateAudioContext() {
-    if (!sharedAudioContext) {
-      const AudioCtx = window.AudioContext || window.webkitAudioContext;
-      sharedAudioContext = new AudioCtx();
-    }
-    if (sharedAudioContext.state === "suspended") {
-      sharedAudioContext.resume().catch(() => {});
-    }
-    return sharedAudioContext;
-  }
-
-  // ==========================================
-  // KEEP-ALIVE & WAKELOCK
-  // ==========================================
-  async function requestScreenWakeLock() {
-    if ('wakeLock' in navigator) {
-      try {
-        wakeLockSentinel = await navigator.wakeLock.request('screen');
-      } catch (err) {
-        console.warn("WakeLock request bypassed:", err);
-      }
-    }
-  }
-
-  document.addEventListener("visibilitychange", async () => {
-    if (document.visibilityState === 'visible' && currentStationId) {
-      if (wakeLockSentinel !== null) {
-        await requestScreenWakeLock();
-      }
-    }
-  });
-
-  function activateKeepAlive(stationTitle) {
-    silentKeepAlive.play().catch(() => {});
-
-    try {
-      const ctx = getOrCreateAudioContext();
-      if (!keepAliveOscillator) {
-        keepAliveOscillator = ctx.createOscillator();
-        const silentGain = ctx.createGain();
-        silentGain.gain.value = 0.0001; // Inaudible
-        keepAliveOscillator.connect(silentGain);
-        silentGain.connect(ctx.destination);
-        keepAliveOscillator.start();
-      }
-    } catch (e) {
-      console.warn("Keep-alive oscillator skipped:", e);
-    }
-
-    requestScreenWakeLock();
-
-    if ('mediaSession' in navigator) {
-      navigator.mediaSession.metadata = new MediaMetadata({
-        title: stationTitle ? stationTitle.replace('station_', '') : 'Live Transmission',
-        artist: 'P2P Voice Radio',
-        album: 'Live Transmission'
-      });
-      navigator.mediaSession.playbackState = 'playing';
-      navigator.mediaSession.setActionHandler('play', () => {
-        if (activeRole === 'listener') {
-          remoteAudio.play().catch(() => {});
-          listenerPlayPauseBtn.innerText = "Pause";
-          isPlaybackPaused = false;
-        }
-      });
-      navigator.mediaSession.setActionHandler('pause', () => {
-        if (activeRole === 'listener') {
-          remoteAudio.pause();
-          listenerPlayPauseBtn.innerText = "Play";
-          isPlaybackPaused = true;
-        }
-      });
-    }
-  }
-
-  // ==========================================
-  // PULL-BASED WORKER SCHEDULER (Freezing Fix)
-  // ==========================================
-  const workerBlobCode = `
-    let timer = null;
-    self.onmessage = function(e) {
-      const data = e.data;
-      if (data.action === 'schedule_next') {
-        if (timer) clearTimeout(timer);
-        timer = setTimeout(() => {
-          self.postMessage({ type: 'tick' });
-        }, data.interval || 1200);
-      } else if (data.action === 'stop') {
-        if (timer) clearTimeout(timer);
-        timer = null;
-      }
+  <script>
+    /**
+     * CONFIGURATION
+     */
+    const CONFIG = {
+      // PASTE YOUR DEPLOYED GOOGLE APPS SCRIPT WEB APP URL HERE
+      APP_SCRIPT_URL: "https://script.google.com/macros/s/AKfycbxGqG4sf8yHLBQvhcZMV0WzeCyjpQiG2pmGW7ZtDY-IAeog3ZclvTNpyST9znjJ88mM/exec",
+      ADMIN_PIN: "1337", // Passcode for host authentication
+      ICE_SERVERS: [{ urls: "stun:stun.l.google.com:19302" }],
+      POLL_INTERVAL: 4000
     };
-  `;
-  const signalingWorker = new Worker(URL.createObjectURL(new Blob([workerBlobCode], { type: 'application/javascript' })));
 
-  signalingWorker.onmessage = async (e) => {
-    if (e.data.type === 'tick') {
-      await executePollCycle();
-      // Schedule next tick strictly after previous cycle completes
-      if (currentStationId) {
-        signalingWorker.postMessage({ action: 'schedule_next', interval: targetPollInterval });
+    // Client State
+    const myPeerId = "peer_" + Math.random().toString(36).substring(2, 9);
+    let isBroadcaster = false;
+    let isBroadcasting = false;
+    let isListening = false;
+    let localStream = null;
+    let audioCtx = null;
+    let analyser = null;
+    let visualizerFrameId = null;
+
+    // WebRTC Storage
+    const peerConnections = {}; // Broadcaster: peerId -> RTCPeerConnection
+    let listenerConnection = null; // Listener: single RTCPeerConnection
+
+    /**
+     * Initialization & Authentication Check
+     */
+    window.addEventListener("DOMContentLoaded", () => {
+      // Enable Host mode via Hash (#host) or PIN prompt
+      if (window.location.hash === "#host") {
+        const pin = prompt("Enter Studio Broadcaster PIN:");
+        if (pin === CONFIG.ADMIN_PIN) {
+          isBroadcaster = true;
+          document.getElementById("broadcasterPanel").style.display = "block";
+        } else {
+          alert("Unauthorized passcode. Defaulting to Listener Mode.");
+          window.location.hash = "";
+        }
       }
-    }
-  };
 
-  function startSignalingWorker(intervalMs) {
-    targetPollInterval = intervalMs;
-    signalingWorker.postMessage({ action: 'schedule_next', interval: 50 });
-  }
+      setupMediaSession();
+      pollStationStatus();
+      setInterval(pollStationStatus, CONFIG.POLL_INTERVAL);
+    });
 
-  function stopSignalingWorker() {
-    signalingWorker.postMessage({ action: 'stop' });
-  }
-
-  // Network Fetch Client
-  async function apiCall(action, payload = {}, retries = 2) {
-    const body = { action, username: currentUser, ...payload };
-    const formData = new URLSearchParams();
-    for (const key in body) {
-      if (typeof body[key] === "object") {
-        formData.append(key, JSON.stringify(body[key]));
-      } else {
-        formData.append(key, body[key] !== undefined ? body[key] : "");
-      }
-    }
-
-    for (let attempt = 0; attempt <= retries; attempt++) {
+    /**
+     * Google Apps Script HTTP Interface
+     */
+    async function apiRequest(action, method = "GET", body = null) {
+      if (!CONFIG.APP_SCRIPT_URL || CONFIG.APP_SCRIPT_URL.includes("YOUR_SCRIPT_ID")) return null;
       try {
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 7000);
-
-        const res = await fetch(GAS_SIGNALING_URL, {
-          method: "POST",
-          headers: { "Content-Type": "application/x-www-form-urlencoded" },
-          body: formData.toString(),
-          signal: controller.signal
-        });
-        clearTimeout(timeoutId);
-
+        let url = `${CONFIG.APP_SCRIPT_URL}?action=${action}&_t=${Date.now()}`;
+        let options = { method: method };
+        if (method === "POST" && body) {
+          options.body = JSON.stringify(body);
+        }
+        const res = await fetch(url, options);
         return await res.json();
       } catch (err) {
-        if (attempt === retries) {
-          return { status: "error", message: err.toString() };
+        console.warn("GAS API Request Failed:", err);
+        return null;
+      }
+    }
+
+    /**
+     * Station & Shoutouts Polling
+     */
+    async function pollStationStatus() {
+      const data = await apiRequest("getStatus");
+      if (!data || data.status !== "success") return;
+
+      const { state, shoutouts } = data;
+      const isLive = state.is_live === "TRUE" || state.is_live === true;
+
+      // Update Header Badge
+      const badge = document.getElementById("liveBadge");
+      badge.textContent = isLive ? "LIVE" : "OFFLINE";
+      badge.className = `status-badge ${isLive ? "live" : ""}`;
+
+      // Update Stream Details
+      document.getElementById("streamTopic").textContent = state.current_topic || "Station Idle";
+      document.getElementById("streamStatusDesc").textContent = isLive 
+        ? "On Air • High-Fidelity Audio Feed" 
+        : "Off Air • Stand by for next broadcast";
+
+      // Render Shoutouts
+      renderShoutouts(shoutouts);
+
+      // Broadcaster loop: Checks for listener join requests
+      if (isBroadcaster && isBroadcasting) {
+        pollBroadcasterSignals();
+      }
+    }
+
+    function renderShoutouts(list) {
+      const container = document.getElementById("shoutoutFeed");
+      if (!list || list.length === 0) {
+        container.innerHTML = `<div style="text-align:center;color:var(--text-muted);margin-top:60px;">No messages yet. Say hello!</div>`;
+        return;
+      }
+      container.innerHTML = list.map(item => `
+        <div class="shoutout-item">
+          <div class="shoutout-meta">${escapeHtml(item.name)} • ${item.timestamp}</div>
+          <div>${escapeHtml(item.message)}</div>
+        </div>
+      `).join('');
+    }
+
+    async function handleSendShoutout(e) {
+      e.preventDefault();
+      const nameInput = document.getElementById("shoutoutName");
+      const msgInput = document.getElementById("shoutoutMsg");
+
+      const payload = {
+        action: "sendShoutout",
+        name: nameInput.value.trim(),
+        message: msgInput.value.trim()
+      };
+
+      msgInput.value = "";
+      await apiRequest("sendShoutout", "POST", payload);
+      pollStationStatus();
+    }
+
+    /**
+     * BROADCASTER (HOST) ENGINE
+     */
+    async function toggleBroadcasting() {
+      const btn = document.getElementById("broadcastToggleBtn");
+      const topicInput = document.getElementById("streamTopicInput");
+
+      if (!isBroadcasting) {
+        try {
+          localStream = await navigator.mediaDevices.getUserMedia({
+            audio: {
+              echoCancellation: true,
+              noiseSuppression: true,
+              autoGainControl: true
+            }
+          });
+
+          isBroadcasting = true;
+          btn.textContent = "Stop Broadcast";
+          btn.classList.add("btn-danger");
+
+          attachVisualizer(localStream, "hostVisualizer");
+
+          await apiRequest("setLiveState", "POST", {
+            action: "setLiveState",
+            isLive: true,
+            topic: topicInput.value || "Live Radio Show"
+          });
+          pollStationStatus();
+        } catch (err) {
+          alert("Microphone Access Denied: " + err.message);
         }
-        await new Promise(r => setTimeout(r, 400));
-      }
-    }
-  }
-
-  // ICE Candidate Local Buffer & Batch Dispatcher
-  function queueIceCandidate(targetUser, candidate) {
-    if (!iceCandidateBuffer[targetUser]) {
-      iceCandidateBuffer[targetUser] = [];
-    }
-    iceCandidateBuffer[targetUser].push(candidate);
-
-    if (!iceBatchTimer) {
-      iceBatchTimer = setTimeout(flushIceCandidateBuffers, 400);
-    }
-  }
-
-  async function flushIceCandidateBuffers() {
-    iceBatchTimer = null;
-    const targets = Object.keys(iceCandidateBuffer);
-    for (const target of targets) {
-      const candidates = iceCandidateBuffer[target];
-      if (candidates && candidates.length > 0) {
-        delete iceCandidateBuffer[target];
-        await apiCall("post_ice_batch", {
-          stationId: currentStationId,
-          toUser: target,
-          candidates: candidates
-        });
-      }
-    }
-  }
-
-  // Safe Opus Stereo SDP Modifier
-  function safelyInjectStereoSDP(sdp) {
-    try {
-      const match = sdp.match(/a=rtpmap:(\d+)\s+opus\/48000\/2/i);
-      if (!match) return sdp;
-      const pt = match[1];
-      const fmtpRegex = new RegExp(`a=fmtp:${pt}\\s+(.+?)\\r\\n`, 'i');
-      if (fmtpRegex.test(sdp)) {
-        return sdp.replace(fmtpRegex, (line, existing) => {
-          let updated = existing;
-          if (!updated.includes("stereo=")) updated += ";stereo=1;sprop-stereo=1";
-          if (!updated.includes("maxaveragebitrate=")) updated += ";maxaveragebitrate=128000";
-          return `a=fmtp:${pt} ${updated}\r\n`;
-        });
       } else {
-        return sdp.replace(match[0] + '\r\n', `${match[0]}\r\na=fmtp:${pt} stereo=1;sprop-stereo=1;maxaveragebitrate=128000\r\n`);
+        // Stop Broadcasting
+        if (localStream) {
+          localStream.getTracks().forEach(track => track.stop());
+        }
+        Object.values(peerConnections).forEach(pc => pc.close());
+        for (let p in peerConnections) delete peerConnections[p];
+
+        isBroadcasting = false;
+        btn.textContent = "Go Live (Start Mic)";
+        btn.classList.remove("btn-danger");
+
+        await apiRequest("setLiveState", "POST", {
+          action: "setLiveState",
+          isLive: false
+        });
+        pollStationStatus();
       }
-    } catch (e) {
-      return sdp;
-    }
-  }
-
-  // =========================================================
-  // ZERO-DESTINATION VISUALIZER (Eliminates CPU Loop / Hang)
-  // =========================================================
-  function initVisualizer(stream) {
-    const ctx = getOrCreateAudioContext();
-
-    // Disconnect previous node to prevent audio graph leaks
-    if (visualizerSourceNode) {
-      try { visualizerSourceNode.disconnect(); } catch (e) {}
-      visualizerSourceNode = null;
     }
 
-    if (!analyserNode) {
-      analyserNode = ctx.createAnalyser();
+    async function pollBroadcasterSignals() {
+      const res = await apiRequest(`getSignals&peerId=HOST`);
+      if (!res || !res.signals) return;
+
+      for (const sig of res.signals) {
+        const listenerId = sig.from;
+
+        if (sig.type === "listener-join") {
+          // New listener joined: Establish RTCPeerConnection
+          setupHostPeerConnection(listenerId);
+        } else if (sig.type === "answer") {
+          const pc = peerConnections[listenerId];
+          if (pc) {
+            await pc.setRemoteDescription(new RTCSessionDescription(sig.payload));
+          }
+        } else if (sig.type === "candidate") {
+          const pc = peerConnections[listenerId];
+          if (pc && sig.payload) {
+            await pc.addIceCandidate(new RTCIceCandidate(sig.payload));
+          }
+        }
+      }
+    }
+
+    async function setupHostPeerConnection(listenerId) {
+      if (peerConnections[listenerId]) peerConnections[listenerId].close();
+
+      const pc = new RTCPeerConnection({ iceServers: CONFIG.ICE_SERVERS });
+      peerConnections[listenerId] = pc;
+
+      // Add local audio tracks to peer connection
+      localStream.getAudioTracks().forEach(track => pc.addTrack(track, localStream));
+
+      pc.onicecandidate = (event) => {
+        if (event.candidate) {
+          apiRequest("sendSignal", "POST", {
+            action: "sendSignal",
+            from: "HOST",
+            to: listenerId,
+            type: "candidate",
+            payload: event.candidate
+          });
+        }
+      };
+
+      pc.onconnectionstatechange = () => {
+        updateActiveListenerCount();
+      };
+
+      const offer = await pc.createOffer();
+      await pc.setLocalDescription(offer);
+
+      await apiRequest("sendSignal", "POST", {
+        action: "sendSignal",
+        from: "HOST",
+        to: listenerId,
+        type: "offer",
+        payload: offer
+      });
+      updateActiveListenerCount();
+    }
+
+    function updateActiveListenerCount() {
+      const active = Object.values(peerConnections).filter(pc => 
+        pc.connectionState === 'connected' || pc.connectionState === 'connecting'
+      ).length;
+      document.getElementById("activePeersCounter").textContent = `${active} Listeners`;
+    }
+
+    /**
+     * LISTENER ENGINE
+     */
+    async function toggleListening() {
+      const btn = document.getElementById("listenBtn");
+      const audioEl = document.getElementById("remoteAudioElement");
+
+      if (!isListening) {
+        initAudioContext();
+        btn.textContent = "Connecting...";
+        btn.disabled = true;
+
+        listenerConnection = new RTCPeerConnection({ iceServers: CONFIG.ICE_SERVERS });
+
+        listenerConnection.ontrack = (event) => {
+          audioEl.srcObject = event.streams[0];
+          audioEl.play().catch(e => console.warn("Autoplay block averted:", e));
+          attachVisualizer(event.streams[0], "listenerVisualizer");
+          btn.textContent = "Disconnect";
+          btn.classList.add("btn-danger");
+          btn.disabled = false;
+          isListening = true;
+          updateMediaSessionPlaybackState(true);
+        };
+
+        listenerConnection.onicecandidate = (event) => {
+          if (event.candidate) {
+            apiRequest("sendSignal", "POST", {
+              action: "sendSignal",
+              from: myPeerId,
+              to: "HOST",
+              type: "candidate",
+              payload: event.candidate
+            });
+          }
+        };
+
+        // Notify Host of connection request
+        await apiRequest("sendSignal", "POST", {
+          action: "sendSignal",
+          from: myPeerId,
+          to: "HOST",
+          type: "listener-join",
+          payload: {}
+        });
+
+        // Listen for Host Offer
+        listenForSignals();
+      } else {
+        disconnectListener();
+      }
+    }
+
+    function disconnectListener() {
+      const btn = document.getElementById("listenBtn");
+      const audioEl = document.getElementById("remoteAudioElement");
+
+      if (listenerConnection) listenerConnection.close();
+      listenerConnection = null;
+      audioEl.srcObject = null;
+      isListening = false;
+
+      btn.textContent = "Tune In (Listen Live)";
+      btn.classList.remove("btn-danger");
+      btn.disabled = false;
+      updateMediaSessionPlaybackState(false);
+    }
+
+    async function listenForSignals() {
+      if (!listenerConnection || isListening) return;
+
+      const res = await apiRequest(`getSignals&peerId=${myPeerId}`);
+      if (res && res.signals) {
+        for (const sig of res.signals) {
+          if (sig.type === "offer") {
+            await listenerConnection.setRemoteDescription(new RTCSessionDescription(sig.payload));
+            const answer = await listenerConnection.createAnswer();
+            await listenerConnection.setLocalDescription(answer);
+
+            await apiRequest("sendSignal", "POST", {
+              action: "sendSignal",
+              from: myPeerId,
+              to: "HOST",
+              type: "answer",
+              payload: answer
+            });
+          } else if (sig.type === "candidate") {
+            if (sig.payload) {
+              await listenerConnection.addIceCandidate(new RTCIceCandidate(sig.payload));
+            }
+          }
+        }
+      }
+      setTimeout(listenForSignals, 1500);
+    }
+
+    /**
+     * AUDIO & VISUALIZATION PIPELINE
+     */
+    function initAudioContext() {
+      if (!audioCtx) {
+        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      }
+      if (audioCtx.state === "suspended") {
+        audioCtx.resume();
+      }
+    }
+
+    function attachVisualizer(stream, canvasId) {
+      initAudioContext();
+      const canvas = document.getElementById(canvasId);
+      const ctx = canvas.getContext("2d");
+      
+      const source = audioCtx.createMediaStreamSource(stream);
+      const analyserNode = audioCtx.createAnalyser();
       analyserNode.fftSize = 64;
-    }
+      source.connect(analyserNode);
 
-    try {
-      visualizerSourceNode = ctx.createMediaStreamSource(stream);
-      // Route exclusively to analyser. DO NOT connect to ctx.destination!
-      visualizerSourceNode.connect(analyserNode);
-    } catch (e) {
-      console.warn("Visualizer node setup bypassed:", e);
-      return;
-    }
+      const bufferLength = analyserNode.frequencyBinCount;
+      const dataArray = new Uint8Array(bufferLength);
 
-    if (!animFrameId) {
-      const dataArray = new Uint8Array(analyserNode.frequencyBinCount);
-      function render() {
-        if (!currentStationId) {
-          animFrameId = null;
-          return;
-        }
-
-        // Throttle frame execution if tab is hidden
-        if (document.hidden) {
-          animFrameId = requestAnimationFrame(render);
-          return;
-        }
-
+      function draw() {
+        visualizerFrameId = requestAnimationFrame(draw);
         analyserNode.getByteFrequencyData(dataArray);
-        for (let i = 0; i < NUM_BARS; i++) {
-          const val = dataArray[i] || 0;
-          const pct = Math.min(100, Math.max(5, (val / 255) * 100));
-          bars[i].style.height = pct + "%";
-        }
-        animFrameId = requestAnimationFrame(render);
-      }
-      animFrameId = requestAnimationFrame(render);
-    }
-  }
 
-  async function captureMicrophone() {
-    if (!localAudioStream) {
-      try {
-        localAudioStream = await navigator.mediaDevices.getUserMedia({
-          audio: {
-            channelCount: 2,
-            echoCancellation: false,
-            autoGainControl: false,
-            noiseSuppression: false
-          },
-          video: false
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        const barWidth = (canvas.width / bufferLength) * 2;
+        let x = 0;
+
+        for (let i = 0; i < bufferLength; i++) {
+          const barHeight = (dataArray[i] / 255) * canvas.height;
+          ctx.fillStyle = `rgb(0, ${Math.min(255, dataArray[i] + 120)}, 254)`;
+          ctx.fillRect(x, canvas.height - barHeight, barWidth - 2, barHeight);
+          x += barWidth;
+        }
+      }
+      draw();
+    }
+
+    function adjustVolume(val) {
+      const audioEl = document.getElementById("remoteAudioElement");
+      audioEl.volume = parseFloat(val);
+    }
+
+    /**
+     * LOCK SCREEN / MEDIA SESSION API
+     */
+    function setupMediaSession() {
+      if ("mediaSession" in navigator) {
+        navigator.mediaSession.metadata = new MediaMetadata({
+          title: "CloudRadio Live Broadcast",
+          artist: "Live Voice Radio",
+          album: "WebRTC Stream"
         });
-      } catch (e) {
-        localAudioStream = await navigator.mediaDevices.getUserMedia({
-          audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
-          video: false
+
+        navigator.mediaSession.setActionHandler("play", () => {
+          if (!isListening) toggleListening();
+        });
+        navigator.mediaSession.setActionHandler("pause", () => {
+          if (isListening) toggleListening();
+        });
+        navigator.mediaSession.setActionHandler("stop", () => {
+          if (isListening) toggleListening();
         });
       }
-
-      const track = localAudioStream.getAudioTracks()[0];
-      const settings = track.getSettings ? track.getSettings() : {};
-      isStereoHardware = !!(settings.channelCount && settings.channelCount >= 2);
-      setChannelBadge(isStereoHardware);
-      initVisualizer(localAudioStream);
-    }
-    return localAudioStream;
-  }
-
-  // ==========================================
-  // BROADCASTER ACTIONS
-  // ==========================================
-  startBroadcastBtn.onclick = async () => {
-    startBroadcastBtn.disabled = true;
-
-    try {
-      await captureMicrophone();
-    } catch (e) {
-      startBroadcastBtn.disabled = false;
-      return alert("Microphone access failed: " + e.message);
     }
 
-    currentStationId = "station_" + currentUser;
-    activeRole = "broadcaster";
-    myStationLabel.innerText = currentUser;
-
-    activateKeepAlive(currentStationId);
-
-    broadcastPreStart.classList.add("hidden");
-    broadcastControls.classList.remove("hidden");
-    listenerCountText.classList.remove("hidden");
-    setStatus("live", "On-Air");
-
-    const res = await apiCall("start_station", { stationId: currentStationId, isStereo: isStereoHardware });
-    if (res.status !== "success") {
-      alert("Unable to register station: " + res.message);
-      return resetSessionState();
-    }
-    startSignalingWorker(1200);
-  };
-
-  pauseBroadcastBtn.onclick = async () => {
-    if (!localAudioStream) return;
-    isBroadcastPaused = !isBroadcastPaused;
-    localAudioStream.getAudioTracks().forEach(t => t.enabled = !isBroadcastPaused);
-
-    pauseBroadcastBtn.innerText = isBroadcastPaused ? "Resume Broadcast" : "Pause Broadcast";
-    pauseBroadcastBtn.className = isBroadcastPaused ? "danger" : "";
-    setStatus(isBroadcastPaused ? "paused" : "live", isBroadcastPaused ? "Paused" : "On-Air");
-
-    await apiCall("set_station_state", {
-      stationId: currentStationId,
-      state: isBroadcastPaused ? "station_paused" : "live"
-    });
-  };
-
-  muteBtn.onclick = () => {
-    if (!localAudioStream) return;
-    isMicMuted = !isMicMuted;
-    localAudioStream.getAudioTracks().forEach(t => t.enabled = !isMicMuted);
-    muteBtn.innerText = isMicMuted ? "Unmute Mic" : "Mute Microphone";
-    muteBtn.className = isMicMuted ? "danger" : "";
-  };
-
-  recordBroadcasterBtn.onclick = () => {
-    if (!localAudioStream) return;
-    if (broadcasterRecorder && broadcasterRecorder.state === "recording") {
-      broadcasterRecorder.stop();
-      recordBroadcasterBtn.innerText = "Record Audio";
-      recordBroadcasterBtn.classList.remove("recording");
-    } else {
-      broadcasterRecordedChunks = [];
-      const mimeType = MediaRecorder.isTypeSupported("audio/webm") ? "audio/webm" : "audio/mp4";
-      broadcasterRecorder = new MediaRecorder(localAudioStream, { mimeType });
-
-      broadcasterRecorder.ondataavailable = (e) => {
-        if (e.data && e.data.size > 0) broadcasterRecordedChunks.push(e.data);
-      };
-
-      broadcasterRecorder.onstop = () => {
-        const blob = new Blob(broadcasterRecordedChunks, { type: mimeType });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement("a");
-        a.href = url;
-        a.download = `broadcast_${currentStationId}_${Date.now()}.${mimeType === "audio/webm" ? "webm" : "mp4"}`;
-        a.click();
-        URL.revokeObjectURL(url);
-      };
-
-      broadcasterRecorder.start();
-      recordBroadcasterBtn.innerText = "Stop Recording";
-      recordBroadcasterBtn.classList.add("recording");
-    }
-  };
-
-  async function setupBroadcasterPeer(listenerUser) {
-    if (broadcasterPeerConnections[listenerUser]) {
-      broadcasterPeerConnections[listenerUser].close();
-    }
-
-    const pc = new RTCPeerConnection(RTC_CONFIG);
-    broadcasterPeerConnections[listenerUser] = pc;
-
-    if (localAudioStream) {
-      localAudioStream.getTracks().forEach(track => {
-        pc.addTransceiver(track, { direction: 'sendonly', streams: [localAudioStream] });
-      });
-    }
-
-    pc.onicecandidate = (event) => {
-      if (event.candidate && event.candidate.candidate) {
-        queueIceCandidate(listenerUser, event.candidate);
-      }
-    };
-
-    pc.oniceconnectionstatechange = () => {
-      if (["disconnected", "failed", "closed"].includes(pc.iceConnectionState)) {
-        delete broadcasterPeerConnections[listenerUser];
-        updateListenerCount();
-      } else if (["connected", "completed"].includes(pc.iceConnectionState)) {
-        updateListenerCount();
-      }
-    };
-
-    const rawOffer = await pc.createOffer();
-    let finalOffer = rawOffer;
-
-    try {
-      const modifiedSdp = safelyInjectStereoSDP(rawOffer.sdp);
-      const testDesc = new RTCSessionDescription({ type: rawOffer.type, sdp: modifiedSdp });
-      await pc.setLocalDescription(testDesc);
-      finalOffer = testDesc;
-    } catch (e) {
-      await pc.setLocalDescription(rawOffer);
-      finalOffer = rawOffer;
-    }
-
-    await apiCall("post_offer", {
-      stationId: currentStationId,
-      toUser: listenerUser,
-      payload: finalOffer
-    });
-  }
-
-  function updateListenerCount() {
-    listenerCountDisplay.innerText = Object.keys(broadcasterPeerConnections).length;
-  }
-
-  // ==========================================
-  // LISTENER ACTIONS & INSTANT TUNE-IN
-  // ==========================================
-  async function fetchStations() {
-    refreshStationsBtn.disabled = true;
-    const res = await apiCall("list_stations");
-    refreshStationsBtn.disabled = false;
-
-    if (res && res.status === "success") {
-      if (!res.stations || res.stations.length === 0) {
-        stationList.innerHTML = `<li class="empty-message">No active stations detected on-air.</li>`;
-      } else {
-        stationList.innerHTML = res.stations
-          .map(s => {
-            const isMe = s.broadcaster === currentUser;
-            const channelText = s.stereo ? "STEREO" : "MONO";
-            const channelClass = s.stereo ? "channel-badge stereo" : "channel-badge";
-            const statusClass = s.status === "live" ? "badge live" : "badge paused";
-            return `
-              <li>
-                <div class="station-info">
-                  <span class="station-name">${s.stationId.replace("station_", "")}</span>
-                  <div style="display: flex; gap: 6px; align-items: center;">
-                    <span class="${channelClass}">${channelText}</span>
-                    <span class="${statusClass}">${s.status === "live" ? "LIVE" : "PAUSED"}</span>
-                  </div>
-                </div>
-                <div>
-                  ${isMe ? '<span class="badge">Your Station</span>' : `<button class="primary" style="padding: 6px 14px; font-size: 0.82rem;" onclick="tuneIntoStation('${s.stationId}', '${s.broadcaster}', ${s.stereo})">Tune In</button>`}
-                </div>
-              </li>
-            `;
-          }).join("");
-      }
-    } else {
-      stationList.innerHTML = `<li class="empty-message" style="color: var(--warn);">Directory synchronization error.</li>`;
-    }
-  }
-  refreshStationsBtn.onclick = fetchStations;
-
-  window.tuneIntoStation = async (stationId, broadcaster, isStereo) => {
-    // Unlock Audio Context on direct user interaction
-    getOrCreateAudioContext();
-    remoteAudio.play().catch(() => {});
-
-    activateKeepAlive(stationId);
-
-    currentStationId = stationId;
-    targetBroadcaster = broadcaster;
-    activeRole = "listener";
-
-    broadcasterCard.classList.add("hidden");
-    listenerCard.classList.remove("hidden");
-    currentStationTitle.innerText = stationId.replace("station_", "");
-    setChannelBadge(isStereo);
-    setStatus("signaling", "Tuning in...");
-
-    if (!hasNotifiedTuneIn) {
-      hasNotifiedTuneIn = true;
-      const res = await apiCall("tune_in", { stationId: currentStationId });
-      if (!res || res.status !== "success") {
-        hasNotifiedTuneIn = false;
-        alert("Tune-in failed: " + (res ? res.message : "Network error"));
-        return resetSessionState();
+    function updateMediaSessionPlaybackState(isPlaying) {
+      if ("mediaSession" in navigator) {
+        navigator.mediaSession.playbackState = isPlaying ? "playing" : "paused";
       }
     }
 
-    setupListenerPeerConnection(broadcaster);
-    startSignalingWorker(1200);
-  };
-
-  function setupListenerPeerConnection(broadcaster) {
-    if (listenerPeerConnection) listenerPeerConnection.close();
-    listenerPeerConnection = new RTCPeerConnection(RTC_CONFIG);
-
-    listenerPeerConnection.addTransceiver('audio', { direction: 'recvonly' });
-
-    listenerPeerConnection.ontrack = (event) => {
-      if (event.streams && event.streams[0]) {
-        remoteAudio.srcObject = event.streams[0];
-        remoteAudio.play().catch(() => {});
-        initVisualizer(event.streams[0]);
-      }
-    };
-
-    listenerPeerConnection.onicecandidate = (event) => {
-      if (event.candidate && event.candidate.candidate) {
-        queueIceCandidate(broadcaster, event.candidate);
-      }
-    };
-
-    listenerPeerConnection.oniceconnectionstatechange = () => {
-      const st = listenerPeerConnection.iceConnectionState;
-      if (st === "checking") setStatus("connecting", "Negotiating...");
-      if (st === "connected" || st === "completed") {
-        setStatus("live", "Tuned In");
-        targetPollInterval = 4000; // Slow down once connected
-      }
-      if (["disconnected", "failed", "closed"].includes(st)) {
-        setStatus("", "Disconnected");
-      }
-    };
-  }
-
-  listenerPlayPauseBtn.onclick = () => {
-    isPlaybackPaused = !isPlaybackPaused;
-    if (isPlaybackPaused) {
-      remoteAudio.pause();
-      listenerPlayPauseBtn.innerText = "Play";
-    } else {
-      remoteAudio.play();
-      listenerPlayPauseBtn.innerText = "Pause";
+    function escapeHtml(str) {
+      const div = document.createElement("div");
+      div.textContent = str;
+      return div.innerHTML;
     }
-  };
-
-  listenerMuteBtn.onclick = () => {
-    isRemoteMuted = !isRemoteMuted;
-    remoteAudio.muted = isRemoteMuted;
-    listenerMuteBtn.innerText = isRemoteMuted ? "Unmute" : "Mute";
-    listenerMuteBtn.className = isRemoteMuted ? "danger" : "";
-  };
-
-  recordListenerBtn.onclick = () => {
-    if (!remoteAudio.srcObject) return alert("No active stream to record.");
-    if (listenerRecorder && listenerRecorder.state === "recording") {
-      listenerRecorder.stop();
-      recordListenerBtn.innerText = "Record Stream";
-      recordListenerBtn.classList.remove("recording");
-    } else {
-      listenerRecordedChunks = [];
-      const mimeType = MediaRecorder.isTypeSupported("audio/webm") ? "audio/webm" : "audio/mp4";
-      listenerRecorder = new MediaRecorder(remoteAudio.srcObject, { mimeType });
-
-      listenerRecorder.ondataavailable = (e) => {
-        if (e.data && e.data.size > 0) listenerRecordedChunks.push(e.data);
-      };
-
-      listenerRecorder.onstop = () => {
-        const blob = new Blob(listenerRecordedChunks, { type: mimeType });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement("a");
-        a.href = url;
-        a.download = `stream_${currentStationId}_${Date.now()}.${mimeType === "audio/webm" ? "webm" : "mp4"}`;
-        a.click();
-        URL.revokeObjectURL(url);
-      };
-
-      listenerRecorder.start();
-      recordListenerBtn.innerText = "Stop Recording";
-      recordListenerBtn.classList.add("recording");
-    }
-  };
-
-  // ==========================================
-  // SEQUENTIAL PULL-BASED SIGNALING CYCLE
-  // ==========================================
-  let isPollingInProgress = false;
-
-  async function executePollCycle() {
-    if (!currentStationId || isPollingInProgress) return;
-    isPollingInProgress = true;
-
-    try {
-      const res = await apiCall("poll_signaling", { stationId: currentStationId, since: lastSyncTimestamp });
-      if (res && res.status === "success") {
-        lastSyncTimestamp = res.serverTime;
-
-        // Broadcaster Inbound Pipeline
-        if (activeRole === "broadcaster") {
-          if (res.newListeners && res.newListeners.length > 0) {
-            for (const item of res.newListeners) {
-              const listener = item.listener;
-              if (!broadcasterPeerConnections[listener]) {
-                await setupBroadcasterPeer(listener);
-              }
-            }
-          }
-          if (res.answers && res.answers.length > 0) {
-            for (const item of res.answers) {
-              const pc = broadcasterPeerConnections[item.from];
-              if (pc && pc.signalingState === "have-local-offer") {
-                await pc.setRemoteDescription(new RTCSessionDescription(item.payload));
-              }
-            }
-          }
-          if (res.ice && res.ice.length > 0) {
-            for (const item of res.ice) {
-              const pc = broadcasterPeerConnections[item.from];
-              if (pc && item.candidate && item.candidate.candidate) {
-                try { await pc.addIceCandidate(new RTCIceCandidate(item.candidate)); } catch (e) {}
-              }
-            }
-          }
-        }
-
-        // Listener Inbound Pipeline
-        if (activeRole === "listener") {
-          if (res.stationState === "station_paused") {
-            stationStateBadge.innerText = "PAUSED";
-            stationStateBadge.className = "badge paused";
-          } else {
-            stationStateBadge.innerText = "LIVE";
-            stationStateBadge.className = "badge live";
-          }
-
-          if (res.offers && res.offers.length > 0) {
-            for (const item of res.offers) {
-              if (item.from === targetBroadcaster && listenerPeerConnection && listenerPeerConnection.signalingState === "stable") {
-                await listenerPeerConnection.setRemoteDescription(new RTCSessionDescription(item.payload));
-                const rawAnswer = await listenerPeerConnection.createAnswer();
-                let finalAnswer = rawAnswer;
-
-                try {
-                  const stereoSdp = safelyInjectStereoSDP(rawAnswer.sdp);
-                  const testAnswer = new RTCSessionDescription({ type: rawAnswer.type, sdp: stereoSdp });
-                  await listenerPeerConnection.setLocalDescription(testAnswer);
-                  finalAnswer = testAnswer;
-                } catch (e) {
-                  await listenerPeerConnection.setLocalDescription(rawAnswer);
-                  finalAnswer = rawAnswer;
-                }
-
-                await apiCall("post_answer", {
-                  stationId: currentStationId,
-                  toUser: targetBroadcaster,
-                  payload: finalAnswer
-                });
-              }
-            }
-          }
-
-          if (res.ice && res.ice.length > 0) {
-            for (const item of res.ice) {
-              if (item.from === targetBroadcaster && listenerPeerConnection && item.candidate && item.candidate.candidate) {
-                try { await listenerPeerConnection.addIceCandidate(new RTCIceCandidate(item.candidate)); } catch (e) {}
-              }
-            }
-          }
-        }
-      }
-    } catch (err) {
-      console.warn("Signaling cycle exception:", err);
-    } finally {
-      isPollingInProgress = false;
-    }
-  }
-
-  // Teardown
-  stopSessionBtn.onclick = resetSessionState;
-  tuneOutBtn.onclick = resetSessionState;
-
-  async function resetSessionState() {
-    stopSignalingWorker();
-    isPollingInProgress = false;
-    hasNotifiedTuneIn = false;
-    targetPollInterval = 1200;
-
-    if (animFrameId) {
-      cancelAnimationFrame(animFrameId);
-      animFrameId = null;
-    }
-
-    if (visualizerSourceNode) {
-      try { visualizerSourceNode.disconnect(); } catch (e) {}
-      visualizerSourceNode = null;
-    }
-
-    if (iceBatchTimer) clearTimeout(iceBatchTimer);
-    iceBatchTimer = null;
-
-    if (wakeLockSentinel !== null) {
-      try { await wakeLockSentinel.release(); } catch (e) {}
-      wakeLockSentinel = null;
-    }
-
-    if (keepAliveOscillator) {
-      try { keepAliveOscillator.stop(); } catch (e) {}
-      keepAliveOscillator = null;
-    }
-
-    silentKeepAlive.pause();
-    silentKeepAlive.currentTime = 0;
-
-    if (broadcasterRecorder && broadcasterRecorder.state === "recording") broadcasterRecorder.stop();
-    if (listenerRecorder && listenerRecorder.state === "recording") listenerRecorder.stop();
-
-    if (activeRole === "broadcaster") {
-      await apiCall("stop_station", { stationId: currentStationId });
-      Object.keys(broadcasterPeerConnections).forEach(k => {
-        broadcasterPeerConnections[k].close();
-        delete broadcasterPeerConnections[k];
-      });
-      listenerCountDisplay.innerText = "0";
-    } else if (activeRole === "listener") {
-      await apiCall("tune_out", { stationId: currentStationId });
-      if (listenerPeerConnection) {
-        listenerPeerConnection.close();
-        listenerPeerConnection = null;
-      }
-    }
-
-    if (localAudioStream) {
-      localAudioStream.getTracks().forEach(t => t.stop());
-      localAudioStream = null;
-    }
-
-    remoteAudio.pause();
-    remoteAudio.srcObject = null;
-
-    bars.forEach(b => b.style.height = "3px");
-    broadcasterCard.classList.remove("hidden");
-    broadcastPreStart.classList.remove("hidden");
-    broadcastControls.classList.add("hidden");
-    listenerCountText.classList.add("hidden");
-    listenerCard.classList.add("hidden");
-    startBroadcastBtn.disabled = false;
-    myStationLabel.innerText = "Off-Air";
-
-    pauseBroadcastBtn.innerText = "Pause Broadcast";
-    pauseBroadcastBtn.className = "";
-    muteBtn.innerText = "Mute Microphone";
-    muteBtn.className = "";
-    recordBroadcasterBtn.innerText = "Record Audio";
-    recordBroadcasterBtn.classList.remove("recording");
-    recordListenerBtn.innerText = "Record Stream";
-    recordListenerBtn.classList.remove("recording");
-
-    currentStationId = null;
-    targetBroadcaster = null;
-    activeRole = null;
-    lastSyncTimestamp = 0;
-    isMicMuted = false;
-    isBroadcastPaused = false;
-    isRemoteMuted = false;
-    isPlaybackPaused = false;
-
-    setStatus("", "Idle");
-    setChannelBadge(false);
-    fetchStations();
-  }
-
-  window.addEventListener("load", () => {
-    fetchStations();
-  });
-</script>
+  </script>
 </body>
 </html>
