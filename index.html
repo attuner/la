@@ -2,8 +2,8 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>P2P Broadcast Audio & Access Gate</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>
+  <title>P2P Voice Switchboard</title>
   <style>
     :root {
       --bg: #0d1117;
@@ -19,12 +19,12 @@
       --muted: #8b949e;
     }
 
-    * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
-    body { background: var(--bg); color: var(--text); min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 1.5rem; }
-    .container { width: 100%; max-width: 520px; background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 24px; box-shadow: 0 8px 24px rgba(0,0,0,0.6); }
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; -webkit-tap-highlight-color: transparent; }
+    body { background: var(--bg); color: var(--text); min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 1rem; }
+    .container { width: 100%; max-width: 520px; background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 20px; box-shadow: 0 8px 24px rgba(0,0,0,0.6); }
 
     header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
-    h1 { font-size: 1.25rem; font-weight: 600; color: var(--text-bright); }
+    h1 { font-size: 1.2rem; font-weight: 600; color: var(--text-bright); }
     .status-badge { display: flex; align-items: center; gap: 6px; font-size: 0.75rem; text-transform: uppercase; font-weight: 700; padding: 4px 8px; border-radius: 999px; background: #21262d; border: 1px solid var(--border); }
     .dot { width: 8px; height: 8px; border-radius: 50%; background: #484f58; }
     .dot.signaling { background: var(--warn); animation: pulse 1s infinite alternate; }
@@ -32,14 +32,14 @@
     .dot.live { background: #3fb950; box-shadow: 0 0 8px #3fb950; }
     @keyframes pulse { from { opacity: 0.3; } to { opacity: 1; } }
 
-    .card { background: #0d1117; border: 1px solid var(--border); border-radius: 8px; padding: 16px; margin-bottom: 16px; }
+    .card { background: #0d1117; border: 1px solid var(--border); border-radius: 8px; padding: 14px; margin-bottom: 14px; }
     .group-label { font-size: 0.75rem; color: var(--muted); text-transform: uppercase; margin-bottom: 8px; font-weight: 600; }
     .flex-row { display: flex; gap: 8px; align-items: center; }
     
-    input[type="text"], input[type="password"] { flex: 1; background: #161b22; border: 1px solid var(--border); border-radius: 6px; padding: 8px 12px; color: var(--text); font-size: 0.9rem; outline: none; }
+    input[type="text"], input[type="password"] { flex: 1; background: #161b22; border: 1px solid var(--border); border-radius: 6px; padding: 10px 12px; color: var(--text); font-size: 0.95rem; outline: none; }
     input[type="text"]:focus, input[type="password"]:focus { border-color: #58a6ff; }
 
-    button { background: #21262d; border: 1px solid var(--border); color: var(--text-bright); padding: 8px 14px; border-radius: 6px; font-size: 0.85rem; font-weight: 500; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; gap: 6px; transition: background 0.15s ease; }
+    button { background: #21262d; border: 1px solid var(--border); color: var(--text-bright); padding: 10px 14px; border-radius: 6px; font-size: 0.85rem; font-weight: 500; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; gap: 6px; transition: background 0.15s ease; touch-action: manipulation; }
     button:hover:not(:disabled) { background: #30363d; }
     button.primary { background: var(--accent); border-color: rgba(255,255,255,0.1); }
     button.primary:hover:not(:disabled) { background: var(--accent-hover); }
@@ -50,12 +50,12 @@
     .visualizer-container { height: 38px; width: 100%; display: flex; align-items: flex-end; gap: 3px; margin: 10px 0; background: #010409; padding: 5px; border-radius: 6px; }
     .visualizer-bar { flex: 1; background: #238636; min-height: 2px; height: 2px; border-radius: 2px; }
 
-    .item-list { list-style: none; font-size: 0.85rem; color: var(--muted); max-height: 140px; overflow-y: auto; }
-    .item-list li { display: flex; justify-content: space-between; align-items: center; padding: 6px 0; border-bottom: 1px dotted var(--border); }
+    .item-list { list-style: none; font-size: 0.85rem; color: var(--muted); max-height: 150px; overflow-y: auto; }
+    .item-list li { display: flex; justify-content: space-between; align-items: center; padding: 8px 0; border-bottom: 1px dotted var(--border); }
     .item-list li:last-child { border-bottom: none; }
     
     .approval-banner { background: #2d2206; border: 1px solid var(--warn); padding: 10px 12px; border-radius: 6px; margin-bottom: 12px; font-size: 0.85rem; display: flex; justify-content: space-between; align-items: center; }
-    .audio-fallback-btn { width: 100%; background: #1f6feb; border-color: #388bfd; margin-top: 10px; padding: 10px; font-weight: bold; }
+    .audio-fallback-btn { width: 100%; background: #1f6feb; border-color: #388bfd; margin-bottom: 12px; padding: 12px; font-weight: bold; }
     .hidden { display: none !important; }
   </style>
 </head>
@@ -70,11 +70,14 @@
     </div>
   </header>
 
+  <!-- Autoplay Fallback Activation Button -->
+  <button id="audioUnlockBtn" class="audio-fallback-btn hidden">Tap to Enable & Listen to Audio</button>
+
   <!-- Auth Panel -->
   <div class="card" id="authSection">
     <div class="group-label">Authentication</div>
     <div class="flex-row" style="margin-bottom: 8px;">
-      <input type="text" id="authUsername" placeholder="Username" autocomplete="off" />
+      <input type="text" id="authUsername" placeholder="Username" autocapitalize="none" autocomplete="off" />
       <input type="password" id="authPassword" placeholder="Password" />
     </div>
     <div class="flex-row">
@@ -83,28 +86,25 @@
     </div>
   </div>
 
-  <!-- Main App Shell -->
+  <!-- App Controls -->
   <div id="appSection" class="hidden">
-    <!-- Active Inbound Approval Requests (Broadcaster Only) -->
+    <!-- Approval Notification Prompt -->
     <div id="incomingRequestContainer"></div>
 
-    <!-- Interactive Autoplay Unlock Button -->
-    <button id="audioUnlockBtn" class="audio-fallback-btn hidden">Click To Enable & Listen to Audio</button>
-
-    <!-- Broadcaster Workbench -->
+    <!-- Broadcaster Section -->
     <div class="card">
       <div class="group-label">Broadcaster Deck</div>
       <div class="visualizer-container" id="visualizer"></div>
       <div class="flex-row">
         <button id="startBroadcastBtn" class="primary" style="flex: 1;">Go Live (Broadcast)</button>
         <button id="muteBtn" disabled>Mute</button>
-        <button id="stopSessionBtn" class="danger" disabled>Stop / Leave</button>
+        <button id="stopSessionBtn" class="danger" disabled>Stop</button>
       </div>
     </div>
 
-    <!-- Listener Directory -->
+    <!-- Live Directory -->
     <div class="card">
-      <div class="group-label">Live Broadcaster Directory</div>
+      <div class="group-label">Active Broadcasters</div>
       <ul class="item-list" id="broadcasterList">
         <li><span>No active broadcasts detected</span></li>
       </ul>
@@ -115,8 +115,8 @@
   </div>
 </div>
 
-<!-- Dedicated remote stream element -->
-<audio id="remoteAudio" autoplay playsinline></audio>
+<!-- Cross-Platform HTML5 Audio Engine with explicit inline attributes -->
+<audio id="remoteAudio" autoplay playsinline webkit-playsinline></audio>
 
 <script>
   /**
@@ -132,12 +132,12 @@
     ]
   };
 
-  // Auth & Session State
+  // State Management
   let currentUser = sessionStorage.getItem("p2p_user") || "";
   let currentPass = sessionStorage.getItem("p2p_pass") || "";
   let currentRoomId = null;
   let activeRole = null; // 'broadcaster' | 'listener'
-  let targetBroadcaster = null;
+  let targetPeerUser = null;
   let activePeerConnection = null;
   let localAudioStream = null;
   let audioContext = null;
@@ -146,6 +146,12 @@
   let sessionTimer = null;
   let lastSyncTimestamp = 0;
   let isMuted = false;
+
+  // ICE Candidate Queue to prevent unhandled race drops
+  let iceCandidatesQueue = [];
+
+  // Persistent reference to safeguard remote streams against mobile GC passes
+  window.remoteStream = null;
 
   // DOM Handles
   const statusDot = document.getElementById("statusDot");
@@ -166,7 +172,7 @@
   const remoteAudio = document.getElementById("remoteAudio");
   const visualizerContainer = document.getElementById("visualizer");
 
-  // Create Visualizer Bars
+  // Generate visualizer bars
   const NUM_BARS = 22;
   const bars = [];
   for (let i = 0; i < NUM_BARS; i++) {
@@ -182,8 +188,25 @@
   }
 
   // ==========================================
-  // 1. RELIABLE BACKEND COMMUNICATION
-  // Using URL-Encoded Form POST / GET to guarantee delivery past GAS CORS redirects
+  // CROSS-PLATFORM USER-GESTURE AUDIO UNLOCKER
+  // Must execute inside synchronous direct user tap
+  // ==========================================
+  function unlockAudioEngine() {
+    if (!audioContext) {
+      const AudioCtx = window.AudioContext || window.webkitAudioContext;
+      if (AudioCtx) audioContext = new AudioCtx();
+    }
+    if (audioContext && audioContext.state === "suspended") {
+      audioContext.resume();
+    }
+    // Prime HTML5 Audio element to bypass WebKit autoplay security
+    if (remoteAudio) {
+      remoteAudio.play().catch(() => {});
+    }
+  }
+
+  // ==========================================
+  // RELIABLE URL-ENCODED SIGNALING CLIENT
   // ==========================================
   async function apiCall(action, payload = {}) {
     const body = {
@@ -193,13 +216,12 @@
       ...payload
     };
 
-    // Serialize as standard application/x-www-form-urlencoded
     const formData = new URLSearchParams();
     for (const key in body) {
       if (typeof body[key] === "object") {
         formData.append(key, JSON.stringify(body[key]));
       } else {
-        formData.append(key, body[key] || "");
+        formData.append(key, body[key] !== undefined ? body[key] : "");
       }
     }
 
@@ -211,15 +233,16 @@
       });
       return await res.json();
     } catch (err) {
-      console.warn("API request failure:", err);
+      console.warn("Signaling Error:", err);
       return { status: "error", message: err.toString() };
     }
   }
 
   // ==========================================
-  // 2. USER AUTHENTICATION PIPELINE
+  // AUTHENTICATION WORKFLOW
   // ==========================================
   registerBtn.onclick = async () => {
+    unlockAudioEngine();
     const u = authUsername.value.trim();
     const p = authPassword.value;
     if (!u || !p) return alert("Enter both username and password.");
@@ -230,21 +253,22 @@
   };
 
   loginBtn.onclick = async () => {
+    unlockAudioEngine();
     const u = authUsername.value.trim();
     const p = authPassword.value;
-    if (!u || !p) return alert("Enter username and password.");
+    if (!u || !p) return alert("Enter both username and password.");
     loginBtn.disabled = true;
     const res = await apiCall("login", { username: u, password: p });
     loginBtn.disabled = false;
 
     if (res.status === "success") {
-      currentUser = u;
+      currentUser = u.toLowerCase();
       currentPass = p;
-      sessionStorage.setItem("p2p_user", u);
-      sessionStorage.setItem("p2p_pass", p);
+      sessionStorage.setItem("p2p_user", currentUser);
+      sessionStorage.setItem("p2p_pass", currentPass);
       initAppUI();
     } else {
-      alert("Auth Error: " + res.message);
+      alert("Auth Failed: " + res.message);
     }
   };
 
@@ -259,11 +283,18 @@
     initAppUI();
   }
 
-  // Audio Context & Visualizer Initializer
+  // ==========================================
+  // AUDIO CONTEXT & VISUALIZER
+  // ==========================================
   function initVisualizer(stream) {
     if (!audioContext) {
-      audioContext = new (window.AudioContext || window.webkitAudioContext)();
+      const AudioCtx = window.AudioContext || window.webkitAudioContext;
+      audioContext = new AudioCtx();
     }
+    if (audioContext.state === "suspended") {
+      audioContext.resume();
+    }
+
     analyserNode = audioContext.createAnalyser();
     analyserNode.fftSize = 64;
     const src = audioContext.createMediaStreamSource(stream);
@@ -284,8 +315,13 @@
 
   async function captureMicrophone() {
     if (!localAudioStream) {
+      // Mobile-compliant standard audio constraints
       localAudioStream = await navigator.mediaDevices.getUserMedia({
-        audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
+        audio: {
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true
+        },
         video: false
       });
       initVisualizer(localAudioStream);
@@ -294,13 +330,14 @@
   }
 
   // ==========================================
-  // 3. BROADCASTER & APPROVAL WORKFLOW
+  // BROADCASTER WORKFLOW
   // ==========================================
   startBroadcastBtn.onclick = async () => {
+    unlockAudioEngine();
     try {
       await captureMicrophone();
     } catch (e) {
-      return alert("Microphone permissions denied: " + e.message);
+      return alert("Microphone capture failed: " + e.message);
     }
 
     currentRoomId = "room_" + currentUser;
@@ -316,23 +353,35 @@
 
   function startBroadcasterLoop() {
     sessionTimer = setInterval(async () => {
-      // 1. Check for incoming listen requests
+      // 1. Poll incoming listener requests
       const reqRes = await apiCall("poll_listen_requests", { roomId: currentRoomId });
       if (reqRes.status === "success" && reqRes.requests.length > 0) {
         renderIncomingRequests(reqRes.requests);
       }
 
-      // 2. Poll for signaling responses (SDP answer and ICE from approved listener)
-      if (activePeerConnection) {
-        const sigRes = await apiCall("poll_signaling", { roomId: currentRoomId, since: lastSyncTimestamp });
+      // 2. Poll signaling specifically addressed to broadcaster
+      if (activePeerConnection && targetPeerUser) {
+        const sigRes = await apiCall("poll_signaling", {
+          roomId: currentRoomId,
+          forUser: currentUser,
+          since: lastSyncTimestamp
+        });
+
         if (sigRes.status === "success") {
           lastSyncTimestamp = sigRes.serverTime;
-          if (sigRes.answer && activePeerConnection.signalingState === "have-local-offer") {
+
+          // Process SDP Answer
+          if (sigRes.answer && sigRes.answer.from === targetPeerUser && activePeerConnection.signalingState === "have-local-offer") {
             await activePeerConnection.setRemoteDescription(new RTCSessionDescription(sigRes.answer.payload));
+            await flushIceCandidatesQueue();
           }
+
+          // Process ICE candidates targeting broadcaster
           if (sigRes.ice && sigRes.ice.length > 0) {
             for (const item of sigRes.ice) {
-              try { await activePeerConnection.addIceCandidate(new RTCIceCandidate(item.candidate)); } catch (e) {}
+              if (item.from === targetPeerUser) {
+                await processIncomingIce(item.candidate);
+              }
             }
           }
         }
@@ -357,12 +406,15 @@
   }
 
   window.handleRequestDecision = async (listener, roomId, decision) => {
+    unlockAudioEngine();
     incomingRequestContainer.innerHTML = "";
     await apiCall("respond_request", { roomId, toUser: listener, decision });
 
     if (decision === "approved") {
-      // Create Peer Connection and dispatch Offer
+      targetPeerUser = listener;
       setupPeerConnection(listener, true);
+
+      // Create Offer and dispatch targeted payload to approved listener
       const offer = await activePeerConnection.createOffer();
       await activePeerConnection.setLocalDescription(offer);
       await apiCall("post_offer", { roomId, toUser: listener, payload: offer });
@@ -370,7 +422,7 @@
   };
 
   // ==========================================
-  // 4. LISTENER WORKFLOW & CONNECTION LOGIC
+  // LISTENER WORKFLOW
   // ==========================================
   async function fetchBroadcasts() {
     const res = await apiCall("list_broadcasts");
@@ -392,22 +444,23 @@
   refreshBroadcastsBtn.onclick = fetchBroadcasts;
 
   window.requestListen = async (roomId, host) => {
+    unlockAudioEngine();
     currentRoomId = roomId;
-    targetBroadcaster = host;
+    targetPeerUser = host;
     activeRole = "listener";
     stopSessionBtn.disabled = false;
     startBroadcastBtn.disabled = true;
-    setStatus("signaling", "Waiting for approval");
+    setStatus("signaling", "Awaiting Approval");
 
     await apiCall("request_listen", { roomId, toUser: host });
 
-    // Poll approval status
+    // Poll for approval status
     sessionTimer = setInterval(async () => {
       const res = await apiCall("check_request_status", { roomId, toUser: host });
       if (res.status === "success") {
         if (res.decision === "rejected") {
           clearInterval(sessionTimer);
-          alert("Your request to listen was declined by " + host);
+          alert("Your request was declined by " + host);
           resetSessionState();
         } else if (res.decision === "approved") {
           clearInterval(sessionTimer);
@@ -422,20 +475,32 @@
     setupPeerConnection(host, false);
 
     sessionTimer = setInterval(async () => {
-      const sigRes = await apiCall("poll_signaling", { roomId, since: lastSyncTimestamp });
+      // Strictly query signaling addressed to this listener
+      const sigRes = await apiCall("poll_signaling", {
+        roomId,
+        forUser: currentUser,
+        since: lastSyncTimestamp
+      });
+
       if (sigRes.status === "success") {
         lastSyncTimestamp = sigRes.serverTime;
-        // Check for Offer
-        if (sigRes.offer && activePeerConnection.signalingState === "stable") {
+
+        // Process SDP Offer
+        if (sigRes.offer && sigRes.offer.from === host && activePeerConnection.signalingState === "stable") {
           await activePeerConnection.setRemoteDescription(new RTCSessionDescription(sigRes.offer.payload));
+          await flushIceCandidatesQueue();
+
           const answer = await activePeerConnection.createAnswer();
           await activePeerConnection.setLocalDescription(answer);
           await apiCall("post_answer", { roomId, toUser: host, payload: answer });
         }
-        // Handle ICE
+
+        // Process ICE candidates targeting this listener
         if (sigRes.ice && sigRes.ice.length > 0) {
           for (const item of sigRes.ice) {
-            try { await activePeerConnection.addIceCandidate(new RTCIceCandidate(item.candidate)); } catch (e) {}
+            if (item.from === host) {
+              await processIncomingIce(item.candidate);
+            }
           }
         }
       }
@@ -443,61 +508,99 @@
   }
 
   // ==========================================
-  // 5. PEERCONNECTION & AUTOPLAY MITIGATION
+  // WEBRTC PEER CONNECTION & ICE BUFFERING
   // ==========================================
-  function setupPeerConnection(targetPeer, isBroadcaster) {
+  function setupPeerConnection(remoteTarget, isBroadcaster) {
     if (activePeerConnection) activePeerConnection.close();
     activePeerConnection = new RTCPeerConnection(RTC_CONFIG);
+    iceCandidatesQueue = [];
 
     if (isBroadcaster && localAudioStream) {
-      // Broadcaster attaches outgoing track
-      localAudioStream.getTracks().forEach(track => activePeerConnection.addTrack(track, localAudioStream));
+      localAudioStream.getTracks().forEach(track => {
+        activePeerConnection.addTrack(track, localAudioStream);
+      });
     } else {
-      // Listener explicitly requests incoming audio transceiver
       activePeerConnection.addTransceiver('audio', { direction: 'recvonly' });
     }
 
+    // Robust Track Binding
     activePeerConnection.ontrack = (event) => {
+      let streamToBind = null;
       if (event.streams && event.streams[0]) {
-        remoteAudio.srcObject = event.streams[0];
-        
-        // Attempt Autoplay
+        streamToBind = event.streams[0];
+      } else if (event.track) {
+        streamToBind = new MediaStream([event.track]);
+      }
+
+      if (streamToBind) {
+        window.remoteStream = streamToBind; // Prevent Mobile Engine GC sweep
+        remoteAudio.srcObject = streamToBind;
+
+        // Attempt playback with fallback unlock overlay
         const playPromise = remoteAudio.play();
         if (playPromise !== undefined) {
           playPromise.then(() => {
             audioUnlockBtn.classList.add("hidden");
           }).catch(err => {
-            console.warn("Autoplay prevented by browser policy:", err);
-            // Show explicit unlock button for user activation
+            console.warn("Autoplay deferred by mobile policy:", err);
             audioUnlockBtn.classList.remove("hidden");
             audioUnlockBtn.onclick = () => {
-              remoteAudio.play();
-              audioUnlockBtn.classList.add("hidden");
+              unlockAudioEngine();
+              remoteAudio.play().then(() => {
+                audioUnlockBtn.classList.add("hidden");
+              });
             };
           });
         }
       }
     };
 
+    // Forward ICE Candidates with strict routing
     activePeerConnection.onicecandidate = (event) => {
       if (event.candidate) {
         apiCall("post_ice", {
           roomId: currentRoomId,
-          toUser: targetPeer,
+          toUser: remoteTarget,
           payload: event.candidate
         });
       }
     };
 
     activePeerConnection.oniceconnectionstatechange = () => {
-      const st = activePeerConnection.iceConnectionState;
-      if (st === "checking") setStatus("connecting", "Negotiating...");
-      if (st === "connected" || st === "completed") setStatus("live", "Live Stream");
-      if (st === "disconnected" || st === "failed" || st === "closed") setStatus("", "Disconnected");
+      const state = activePeerConnection.iceConnectionState;
+      if (state === "checking") setStatus("connecting", "Negotiating...");
+      if (state === "connected" || state === "completed") setStatus("live", "Live Stream");
+      if (state === "disconnected" || state === "failed" || state === "closed") setStatus("", "Disconnected");
     };
   }
 
-  // Mute / Unmute
+  async function processIncomingIce(candidate) {
+    if (!activePeerConnection || !activePeerConnection.remoteDescription || !activePeerConnection.remoteDescription.type) {
+      // Buffer candidates if remote description is not set yet
+      iceCandidatesQueue.push(candidate);
+    } else {
+      try {
+        await activePeerConnection.addIceCandidate(new RTCIceCandidate(candidate));
+      } catch (err) {
+        console.warn("ICE insertion non-fatal error:", err);
+      }
+    }
+  }
+
+  async function flushIceCandidatesQueue() {
+    while (iceCandidatesQueue.length > 0) {
+      const candidate = iceCandidatesQueue.shift();
+      try {
+        await activePeerConnection.addIceCandidate(new RTCIceCandidate(candidate));
+      } catch (err) {
+        console.warn("Queued ICE insertion non-fatal error:", err);
+      }
+    }
+  }
+
+  // ==========================================
+  // CONTROLS & TEARDOWN
+  // ==========================================
   muteBtn.onclick = () => {
     if (!localAudioStream) return;
     isMuted = !isMuted;
@@ -506,7 +609,6 @@
     muteBtn.className = isMuted ? "danger" : "";
   };
 
-  // Session Teardown
   stopSessionBtn.onclick = resetSessionState;
 
   async function resetSessionState() {
@@ -529,6 +631,8 @@
       localAudioStream = null;
     }
 
+    window.remoteStream = null;
+    iceCandidatesQueue = [];
     bars.forEach(b => b.style.height = "2px");
     audioUnlockBtn.classList.add("hidden");
     incomingRequestContainer.innerHTML = "";
@@ -536,7 +640,7 @@
     muteBtn.disabled = true;
     stopSessionBtn.disabled = true;
     currentRoomId = null;
-    targetBroadcaster = null;
+    targetPeerUser = null;
     activeRole = null;
     lastSyncTimestamp = 0;
     setStatus("", currentUser);
