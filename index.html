@@ -1,0 +1,477 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Ephemeral P2P Live Audio</title>
+  <style>
+    :root {
+      --bg: #0d1117;
+      --panel: #161b22;
+      --border: #30363d;
+      --accent: #238636;
+      --accent-hover: #2ea043;
+      --danger: #da3633;
+      --danger-hover: #f85149;
+      --text: #c9d1d9;
+      --text-bright: #ffffff;
+      --muted: #8b949e;
+      --indicator-off: #484f58;
+      --indicator-on: #3fb950;
+      --indicator-warn: #d29922;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
+    body { background: var(--bg); color: var(--text); min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 1.5rem; }
+    .container { width: 100%; max-width: 480px; background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 24px; box-shadow: 0 8px 24px rgba(0,0,0,0.5); }
+    
+    header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+    h1 { font-size: 1.25rem; font-weight: 600; color: var(--text-bright); }
+    .status-badge { display: flex; align-items: center; gap: 6px; font-size: 0.75rem; text-transform: uppercase; font-weight: 700; letter-spacing: 0.05em; padding: 4px 8px; border-radius: 999px; background: #21262d; border: 1px solid var(--border); }
+    .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--indicator-off); }
+    .dot.signaling { background: var(--indicator-warn); animation: pulse 1s infinite alternate; }
+    .dot.connecting { background: var(--indicator-warn); animation: pulse 0.5s infinite alternate; }
+    .dot.live { background: var(--indicator-on); box-shadow: 0 0 8px var(--indicator-on); }
+    
+    @keyframes pulse { from { opacity: 0.4; } to { opacity: 1; } }
+
+    .card { background: #0d1117; border: 1px solid var(--border); border-radius: 8px; padding: 16px; margin-bottom: 16px; }
+    .group-label { font-size: 0.75rem; color: var(--muted); text-transform: uppercase; margin-bottom: 8px; font-weight: 600; }
+    .flex-row { display: flex; gap: 8px; }
+    
+    input[type="text"] { flex: 1; background: #161b22; border: 1px solid var(--border); border-radius: 6px; padding: 8px 12px; color: var(--text); font-size: 0.9rem; outline: none; }
+    input[type="text"]:focus { border-color: #58a6ff; }
+
+    button { background: #21262d; border: 1px solid var(--border); color: var(--text-bright); padding: 8px 14px; border-radius: 6px; font-size: 0.9rem; font-weight: 500; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; transition: background 0.15s ease; }
+    button:hover:not(:disabled) { background: #30363d; }
+    button.primary { background: var(--accent); border-color: rgba(255,255,255,0.1); }
+    button.primary:hover:not(:disabled) { background: var(--accent-hover); }
+    button.danger { background: var(--danger); border-color: rgba(255,255,255,0.1); }
+    button.danger:hover:not(:disabled) { background: var(--danger-hover); }
+    button:disabled { opacity: 0.5; cursor: not-allowed; }
+
+    .visualizer-container { height: 40px; width: 100%; display: flex; align-items: flex-end; gap: 3px; margin: 12px 0; background: #010409; padding: 6px; border-radius: 6px; }
+    .visualizer-bar { flex: 1; background: #238636; min-height: 2px; height: 2px; border-radius: 2px; transition: height 0.05s ease; }
+
+    .peer-list { list-style: none; font-size: 0.85rem; color: var(--muted); max-height: 100px; overflow-y: auto; }
+    .peer-list li { display: flex; justify-content: space-between; padding: 4px 0; border-bottom: 1px dotted var(--border); }
+    .peer-list li:last-child { border-bottom: none; }
+    
+    .privacy-notice { font-size: 0.7rem; color: var(--muted); text-align: center; margin-top: 12px; line-height: 1.4; }
+  </style>
+</head>
+<body>
+
+<div class="container">
+  <header>
+    <h1>P2P Audio Bridge</h1>
+    <div class="status-badge">
+      <span class="dot" id="statusDot"></span>
+      <span id="statusText">Disconnected</span>
+    </div>
+  </header>
+
+  <!-- Step 1: Room Setup -->
+  <div class="card" id="roomSection">
+    <div class="group-label">Room Operations</div>
+    <div class="flex-row" style="margin-bottom: 8px;">
+      <button class="primary" id="createBtn" style="flex: 1;">Create Room</button>
+      <button id="copyBtn" style="display: none;">Copy Link</button>
+    </div>
+    <div class="flex-row">
+      <input type="text" id="roomIdInput" placeholder="Paste or enter Room ID" />
+      <button id="joinBtn">Join</button>
+    </div>
+  </div>
+
+  <!-- Step 2: Audio Engine Controls -->
+  <div class="card">
+    <div class="group-label">Microphone & Transmission</div>
+    <div class="visualizer-container" id="visualizer">
+      <!-- 20 Visualizer bars -->
+    </div>
+    <div class="flex-row">
+      <button id="micToggleBtn" class="primary" style="flex: 1;">Turn On Mic</button>
+      <button id="muteBtn" style="flex: 1;" disabled>Mute</button>
+      <button id="leaveBtn" class="danger" disabled>Leave</button>
+    </div>
+  </div>
+
+  <!-- Step 3: Peer Monitoring -->
+  <div class="card">
+    <div class="group-label">Active Transceivers</div>
+    <ul class="peer-list" id="peerList">
+      <li><span>No peers detected</span></li>
+    </ul>
+  </div>
+
+  <div class="privacy-notice">
+    🔒 <strong>Zero Data Retention:</strong> Audio tracks run strictly peer-to-peer via WebRTC MediaStreams. No audio data ever touches a storage server, database, or Google Apps Script.
+  </div>
+</div>
+
+<!-- Hidden audio player for remote stream delivery -->
+<audio id="remoteAudio" autoplay playsinline></audio>
+
+<script>
+  /**
+   * CONFIGURATION
+   * Paste your published Google Apps Script Web App URL below:
+   */
+  const GAS_SIGNALING_URL = "https://script.google.com/macros/s/AKfycbxluLFX60cKN1ydSvbeRKzXdr7ohjhpsPBLR65vEZtxLiPRImDH6M1jlENg3ab46Ww0/exec";
+
+  const RTC_CONFIG = {
+    iceServers: [
+      { urls: "stun:stun.l.google.com:19302" },
+      { urls: "stun:stun1.l.google.com:19302" }
+    ]
+  };
+
+  // State Management
+  let localStream = null;
+  let peerConnection = null;
+  let audioContext = null;
+  let analyserNode = null;
+  let animFrameId = null;
+  let pollInterval = null;
+  let lastIceTimestamp = 0;
+  
+  const peerId = "peer_" + Math.random().toString(36).substring(2, 9);
+  let currentRoomId = null;
+  let role = null; // 'caller' (room creator) or 'callee' (joiner)
+  let isMuted = false;
+
+  // DOM Elements
+  const statusDot = document.getElementById("statusDot");
+  const statusText = document.getElementById("statusText");
+  const roomIdInput = document.getElementById("roomIdInput");
+  const createBtn = document.getElementById("createBtn");
+  const joinBtn = document.getElementById("joinBtn");
+  const copyBtn = document.getElementById("copyBtn");
+  const micToggleBtn = document.getElementById("micToggleBtn");
+  const muteBtn = document.getElementById("muteBtn");
+  const leaveBtn = document.getElementById("leaveBtn");
+  const peerList = document.getElementById("peerList");
+  const remoteAudio = document.getElementById("remoteAudio");
+  const visualizerContainer = document.getElementById("visualizer");
+
+  // Build visualizer bars
+  const NUM_BARS = 20;
+  const bars = [];
+  for (let i = 0; i < NUM_BARS; i++) {
+    const bar = document.createElement("div");
+    bar.className = "visualizer-bar";
+    visualizerContainer.appendChild(bar);
+    bars.push(bar);
+  }
+
+  // Handle URL Auto-fill
+  window.addEventListener("load", () => {
+    const params = new URLSearchParams(window.location.search);
+    const roomParam = params.get("room");
+    if (roomParam) {
+      roomIdInput.value = roomParam;
+    }
+  });
+
+  // UI Status Controller
+  function setStatus(state, message) {
+    statusDot.className = "dot " + state;
+    statusText.innerText = message;
+  }
+
+  // Web Audio Visualizer Pipeline
+  function initVisualizer(stream) {
+    if (!audioContext) {
+      audioContext = new (window.AudioContext || window.webkitAudioContext)();
+    }
+    analyserNode = audioContext.createAnalyser();
+    analyserNode.fftSize = 64;
+    const source = audioContext.createMediaStreamSource(stream);
+    source.connect(analyserNode);
+
+    const bufferLength = analyserNode.frequencyBinCount;
+    const dataArray = new Uint8Array(bufferLength);
+
+    function render() {
+      analyserNode.getByteFrequencyData(dataArray);
+      for (let i = 0; i < NUM_BARS; i++) {
+        const val = dataArray[i] || 0;
+        const percent = Math.min(100, Math.max(5, (val / 255) * 100));
+        bars[i].style.height = `${percent}%`;
+      }
+      animFrameId = requestAnimationFrame(render);
+    }
+    render();
+  }
+
+  // Audio Device Capture
+  async function initMicrophone() {
+    try {
+      if (!localStream) {
+        localStream = await navigator.mediaDevices.getUserMedia({ 
+          audio: {
+            echoCancellation: true,
+            noiseSuppression: true,
+            autoGainControl: true
+          }, 
+          video: false 
+        });
+        initVisualizer(localStream);
+        micToggleBtn.innerText = "Mic Active";
+        micToggleBtn.disabled = true;
+        muteBtn.disabled = false;
+      }
+      return true;
+    } catch (err) {
+      alert("Microphone Access Error: " + err.message);
+      return false;
+    }
+  }
+
+  // Signaling Network Client
+  async function signalPost(payload) {
+    try {
+      await fetch(GAS_SIGNALING_URL, {
+        method: "POST",
+        mode: "no-cors", // Standard cross-origin GAS delivery
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      });
+    } catch (err) {
+      console.warn("Signaling POST Error:", err);
+    }
+  }
+
+  async function signalGet(params) {
+    try {
+      const url = new URL(GAS_SIGNALING_URL);
+      Object.keys(params).forEach(k => url.searchParams.append(k, params[k]));
+      const res = await fetch(url.toString());
+      return await res.json();
+    } catch (err) {
+      console.warn("Signaling GET Error:", err);
+      return null;
+    }
+  }
+
+  // WebRTC Core Initialization
+  function setupPeerConnection() {
+    peerConnection = new RTCPeerConnection(RTC_CONFIG);
+
+    // Mount tracks into PeerConnection
+    if (localStream) {
+      localStream.getTracks().forEach(track => peerConnection.addTrack(track, localStream));
+    }
+
+    // Capture dynamic incoming remote stream
+    peerConnection.ontrack = (event) => {
+      if (event.streams && event.streams[0]) {
+        remoteAudio.srcObject = event.streams[0];
+        // Attempt autoplay resolution for modern browser playback policies
+        remoteAudio.play().catch(() => {
+          window.addEventListener('click', () => remoteAudio.play(), { once: true });
+        });
+      }
+    };
+
+    // Forward ICE Candidates to signaling sheet
+    peerConnection.onicecandidate = (event) => {
+      if (event.candidate) {
+        signalPost({
+          action: "post_ice",
+          roomId: currentRoomId,
+          peerId: peerId,
+          role: role,
+          payload: event.candidate
+        });
+      }
+    };
+
+    peerConnection.oniceconnectionstatechange = () => {
+      const s = peerConnection.iceConnectionState;
+      if (s === "checking") setStatus("connecting", "Connecting");
+      if (s === "connected" || s === "completed") {
+        setStatus("live", "Live P2P");
+        clearInterval(pollInterval); // Cease heavy polling once direct connection establishes
+      }
+      if (s === "disconnected" || s === "failed" || s === "closed") {
+        setStatus("", "Disconnected");
+      }
+    };
+  }
+
+  // Polling Engine (1.5s interval)
+  function startPolling() {
+    pollInterval = setInterval(async () => {
+      if (!currentRoomId) return;
+
+      // 1. Peer Presence
+      const peerData = await signalGet({ action: "get_peers", roomId: currentRoomId, peerId });
+      if (peerData && peerData.peers) {
+        peerList.innerHTML = peerData.peers.map(p => `<li><span>${p}</span><span>${p === peerId ? "(You)" : "Remote"}</span></li>`).join('');
+      }
+
+      // 2. Negotiate Offer/Answer Handshake
+      if (role === "caller") {
+        const ans = await signalGet({ action: "get_answer", roomId: currentRoomId, peerId });
+        if (ans && ans.answer && peerConnection.signalingState === "have-local-offer") {
+          await peerConnection.setRemoteDescription(new RTCSessionDescription(ans.answer));
+        }
+      } else if (role === "callee") {
+        const off = await signalGet({ action: "get_offer", roomId: currentRoomId, peerId });
+        if (off && off.offer && peerConnection.signalingState === "stable") {
+          await peerConnection.setRemoteDescription(new RTCSessionDescription(off.offer));
+          const answer = await peerConnection.createAnswer();
+          await peerConnection.setLocalDescription(answer);
+          await signalPost({
+            action: "post_answer",
+            roomId: currentRoomId,
+            peerId: peerId,
+            role: "callee",
+            payload: answer
+          });
+        }
+      }
+
+      // 3. Collect Candidate Swarm
+      const iceData = await signalGet({ action: "get_ice", roomId: currentRoomId, peerId, since: lastIceTimestamp });
+      if (iceData && iceData.candidates && iceData.candidates.length > 0) {
+        for (const item of iceData.candidates) {
+          if (item.timestamp > lastIceTimestamp) {
+            lastIceTimestamp = item.timestamp;
+            try {
+              await peerConnection.addIceCandidate(new RTCIceCandidate(item.candidate));
+            } catch (e) {
+              console.warn("Non-fatal ICE insertion error:", e);
+            }
+          }
+        }
+      }
+    }, 1500);
+  }
+
+  // Button Interactions
+  createBtn.onclick = async () => {
+    const micReady = await initMicrophone();
+    if (!micReady) return;
+
+    currentRoomId = "room_" + Math.random().toString(36).substring(2, 8);
+    role = "caller";
+    roomIdInput.value = currentRoomId;
+    roomIdInput.disabled = true;
+    createBtn.disabled = true;
+    joinBtn.disabled = true;
+    leaveBtn.disabled = false;
+    copyBtn.style.display = "inline-flex";
+
+    setStatus("signaling", "Registering");
+
+    await signalPost({ action: "create_room", roomId: currentRoomId, peerId, role: "caller" });
+    setupPeerConnection();
+
+    // Create and dispatch SDP Offer
+    const offer = await peerConnection.createOffer();
+    await peerConnection.setLocalDescription(offer);
+    await signalPost({ action: "post_offer", roomId: currentRoomId, peerId, role: "caller", payload: offer });
+
+    setStatus("signaling", "Awaiting Peer");
+    startPolling();
+  };
+
+  joinBtn.onclick = async () => {
+    const targetRoom = roomIdInput.value.trim();
+    if (!targetRoom) return alert("Provide a valid Room ID.");
+    
+    const micReady = await initMicrophone();
+    if (!micReady) return;
+
+    currentRoomId = targetRoom;
+    role = "callee";
+    roomIdInput.disabled = true;
+    createBtn.disabled = true;
+    joinBtn.disabled = true;
+    leaveBtn.disabled = false;
+
+    setStatus("signaling", "Joining...");
+    await signalPost({ action: "join_room", roomId: currentRoomId, peerId, role: "callee" });
+    setupPeerConnection();
+    startPolling();
+  };
+
+  copyBtn.onclick = () => {
+    const shareUrl = `${window.location.origin}${window.location.pathname}?room=${currentRoomId}`;
+    navigator.clipboard.writeText(shareUrl).then(() => {
+      copyBtn.innerText = "Copied!";
+      setTimeout(() => copyBtn.innerText = "Copy Link", 2000);
+    });
+  };
+
+  micToggleBtn.onclick = async () => {
+    await initMicrophone();
+  };
+
+  muteBtn.onclick = () => {
+    if (!localStream) return;
+    isMuted = !isMuted;
+    localStream.getAudioTracks().forEach(track => track.enabled = !isMuted);
+    muteBtn.innerText = isMuted ? "Unmute" : "Mute";
+    muteBtn.className = isMuted ? "danger" : "";
+  };
+
+  leaveBtn.onclick = cleanupSession;
+
+  async function cleanupSession() {
+    if (pollInterval) clearInterval(pollInterval);
+    if (animFrameId) cancelAnimationFrame(animFrameId);
+    
+    if (currentRoomId) {
+      await signalPost({ action: "leave_room", roomId: currentRoomId, peerId });
+    }
+
+    if (peerConnection) {
+      peerConnection.close();
+      peerConnection = null;
+    }
+
+    if (localStream) {
+      localStream.getTracks().forEach(t => t.stop());
+      localStream = null;
+    }
+
+    if (audioContext) {
+      audioContext.close();
+      audioContext = null;
+    }
+
+    // Reset visualizer bars
+    bars.forEach(b => b.style.height = "2px");
+
+    // UI Reset
+    setStatus("", "Disconnected");
+    roomIdInput.disabled = false;
+    roomIdInput.value = "";
+    createBtn.disabled = false;
+    joinBtn.disabled = false;
+    leaveBtn.disabled = true;
+    copyBtn.style.display = "none";
+    micToggleBtn.disabled = false;
+    micToggleBtn.innerText = "Turn On Mic";
+    muteBtn.disabled = true;
+    peerList.innerHTML = "<li><span>No peers detected</span></li>";
+    currentRoomId = null;
+    role = null;
+  }
+
+  // Graceful browser shutdown handling
+  window.addEventListener("beforeunload", () => {
+    if (currentRoomId) {
+      navigator.sendBeacon(
+        GAS_SIGNALING_URL, 
+        JSON.stringify({ action: "leave_room", roomId: currentRoomId, peerId })
+      );
+    }
+  });
+</script>
+</body>
+</html>
