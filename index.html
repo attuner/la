@@ -2,8 +2,11 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>P2P Instant Stereo Radio v5</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="theme-color" content="#0d1117" />
+  <title>P2P Instant Stereo Radio v6</title>
   <style>
     :root {
       --bg: #0d1117;
@@ -20,56 +23,280 @@
       --stereo: #a371f7;
     }
 
-    * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
-    body { background: var(--bg); color: var(--text); min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 1.5rem; }
-    .container { width: 100%; max-width: 540px; background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 24px; box-shadow: 0 8px 24px rgba(0,0,0,0.6); }
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, sans-serif;
+      -webkit-tap-highlight-color: transparent;
+      touch-action: manipulation;
+    }
 
-    header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
-    h1 { font-size: 1.25rem; font-weight: 600; color: var(--text-bright); }
-    .status-group { display: flex; align-items: center; gap: 8px; }
-    .status-badge { display: flex; align-items: center; gap: 6px; font-size: 0.75rem; text-transform: uppercase; font-weight: 700; padding: 4px 8px; border-radius: 999px; background: #21262d; border: 1px solid var(--border); }
-    .channel-badge { font-size: 0.7rem; font-weight: 700; padding: 3px 6px; border-radius: 4px; background: #21262d; border: 1px solid var(--border); color: var(--muted); }
-    .channel-badge.stereo { background: #2e1a47; border-color: var(--stereo); color: var(--stereo); }
-    .dot { width: 8px; height: 8px; border-radius: 50%; background: #484f58; }
-    .dot.signaling { background: var(--warn); animation: pulse 0.5s infinite alternate; }
-    .dot.live { background: #3fb950; box-shadow: 0 0 8px #3fb950; }
-    .dot.paused { background: var(--warn); }
-    @keyframes pulse { from { opacity: 0.3; } to { opacity: 1; } }
+    body {
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100dvh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: flex-start;
+      padding: calc(env(safe-area-inset-top) + 12px) 16px calc(env(safe-area-inset-bottom) + 16px);
+      overflow-x: hidden;
+    }
 
-    .card { background: #0d1117; border: 1px solid var(--border); border-radius: 8px; padding: 16px; margin-bottom: 16px; }
-    .group-label { font-size: 0.75rem; color: var(--muted); text-transform: uppercase; margin-bottom: 8px; font-weight: 600; display: flex; justify-content: space-between; align-items: center; }
-    .flex-row { display: flex; gap: 8px; align-items: center; }
-    
-    input[type="text"] { flex: 1; background: #161b22; border: 1px solid var(--border); border-radius: 6px; padding: 8px 12px; color: var(--text); font-size: 0.9rem; outline: none; }
-    input[type="text"]:focus { border-color: #58a6ff; }
+    .container {
+      width: 100%;
+      max-width: 540px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
 
-    button { background: #21262d; border: 1px solid var(--border); color: var(--text-bright); padding: 8px 14px; border-radius: 6px; font-size: 0.85rem; font-weight: 500; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; gap: 6px; transition: background 0.15s ease; }
-    button:hover:not(:disabled) { background: #30363d; }
-    button.primary { background: var(--accent); border-color: rgba(255,255,255,0.1); }
-    button.primary:hover:not(:disabled) { background: var(--accent-hover); }
-    button.danger { background: var(--danger); border-color: rgba(255,255,255,0.1); }
-    button.danger:hover:not(:disabled) { background: var(--danger-hover); }
-    button.recording { background: #b62324; border-color: #ff7b72; animation: pulse 0.8s infinite alternate; }
-    button:disabled { opacity: 0.45; cursor: not-allowed; }
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 8px 0 4px;
+    }
 
-    .visualizer-container { height: 38px; width: 100%; display: flex; align-items: flex-end; gap: 3px; margin: 10px 0; background: #010409; padding: 5px; border-radius: 6px; }
-    .visualizer-bar { flex: 1; background: #238636; min-height: 2px; height: 2px; border-radius: 2px; }
+    h1 {
+      font-size: 1.2rem;
+      font-weight: 700;
+      color: var(--text-bright);
+      letter-spacing: -0.02em;
+    }
 
-    .item-list { list-style: none; font-size: 0.85rem; color: var(--muted); max-height: 180px; overflow-y: auto; }
-    .item-list li { display: flex; justify-content: space-between; align-items: center; padding: 10px 0; border-bottom: 1px dotted var(--border); }
-    .item-list li:last-child { border-bottom: none; }
+    .status-group {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
 
-    .hidden { display: none !important; }
-    .badge { background: #21262d; border: 1px solid var(--border); padding: 2px 6px; border-radius: 4px; font-size: 0.75rem; color: var(--muted); }
-    .badge.live { color: #3fb950; border-color: #238636; }
-    .badge.paused { color: var(--warn); border-color: var(--warn); }
+    .status-badge {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 0.72rem;
+      text-transform: uppercase;
+      font-weight: 700;
+      padding: 6px 10px;
+      border-radius: 999px;
+      background: #21262d;
+      border: 1px solid var(--border);
+    }
+
+    .channel-badge {
+      font-size: 0.7rem;
+      font-weight: 700;
+      padding: 5px 8px;
+      border-radius: 6px;
+      background: #21262d;
+      border: 1px solid var(--border);
+      color: var(--muted);
+    }
+
+    .channel-badge.stereo {
+      background: #2e1a47;
+      border-color: var(--stereo);
+      color: var(--stereo);
+    }
+
+    .dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: #484f58;
+    }
+
+    .dot.signaling {
+      background: var(--warn);
+      animation: pulse 0.5s infinite alternate;
+    }
+
+    .dot.live {
+      background: #3fb950;
+      box-shadow: 0 0 8px #3fb950;
+    }
+
+    .dot.paused {
+      background: var(--warn);
+    }
+
+    @keyframes pulse {
+      from { opacity: 0.3; }
+      to { opacity: 1; }
+    }
+
+    .card {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 16px;
+      box-shadow: 0 4px 16px rgba(0,0,0,0.4);
+    }
+
+    .group-label {
+      font-size: 0.75rem;
+      color: var(--muted);
+      text-transform: uppercase;
+      margin-bottom: 10px;
+      font-weight: 600;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .flex-row {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+    }
+
+    input[type="text"] {
+      flex: 1;
+      min-height: 48px;
+      background: #0d1117;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 0 14px;
+      color: var(--text-bright);
+      font-size: 0.95rem;
+      outline: none;
+      -webkit-appearance: none;
+    }
+
+    input[type="text"]:focus {
+      border-color: #58a6ff;
+    }
+
+    button {
+      min-height: 48px;
+      min-width: 48px;
+      background: #21262d;
+      border: 1px solid var(--border);
+      color: var(--text-bright);
+      padding: 0 16px;
+      border-radius: 8px;
+      font-size: 0.9rem;
+      font-weight: 600;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      transition: background 0.15s ease, transform 0.05s ease;
+      user-select: none;
+    }
+
+    button:active:not(:disabled) {
+      transform: scale(0.98);
+    }
+
+    button:hover:not(:disabled) {
+      background: #30363d;
+    }
+
+    button.primary {
+      background: var(--accent);
+      border-color: rgba(255,255,255,0.1);
+    }
+
+    button.primary:hover:not(:disabled) {
+      background: var(--accent-hover);
+    }
+
+    button.danger {
+      background: var(--danger);
+      border-color: rgba(255,255,255,0.1);
+    }
+
+    button.danger:hover:not(:disabled) {
+      background: var(--danger-hover);
+    }
+
+    button.recording {
+      background: #b62324;
+      border-color: #ff7b72;
+      animation: pulse 0.8s infinite alternate;
+    }
+
+    button:disabled {
+      opacity: 0.45;
+      cursor: not-allowed;
+    }
+
+    .visualizer-container {
+      height: 40px;
+      width: 100%;
+      display: flex;
+      align-items: flex-end;
+      gap: 3px;
+      margin: 10px 0 14px;
+      background: #010409;
+      padding: 4px 6px;
+      border-radius: 8px;
+    }
+
+    .visualizer-bar {
+      flex: 1;
+      background: #238636;
+      min-height: 2px;
+      height: 2px;
+      border-radius: 2px;
+    }
+
+    .item-list {
+      list-style: none;
+      font-size: 0.9rem;
+      color: var(--muted);
+      max-height: 240px;
+      overflow-y: auto;
+      -webkit-overflow-scrolling: touch;
+    }
+
+    .item-list li {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      min-height: 52px;
+      padding: 8px 0;
+      border-bottom: 1px dotted var(--border);
+    }
+
+    .item-list li:last-child {
+      border-bottom: none;
+    }
+
+    .hidden {
+      display: none !important;
+    }
+
+    .badge {
+      background: #21262d;
+      border: 1px solid var(--border);
+      padding: 4px 8px;
+      border-radius: 6px;
+      font-size: 0.75rem;
+      font-weight: 700;
+      color: var(--muted);
+    }
+
+    .badge.live {
+      color: #3fb950;
+      border-color: #238636;
+    }
+
+    .badge.paused {
+      color: var(--warn);
+      border-color: var(--warn);
+    }
   </style>
 </head>
 <body>
 
 <div class="container">
   <header>
-    <h1>P2P Radio Station</h1>
+    <h1>P2P Radio</h1>
     <div class="status-group">
       <span class="channel-badge" id="channelBadge">MONO (1-CH)</span>
       <div class="status-badge">
@@ -79,47 +306,47 @@
     </div>
   </header>
 
-  <!-- Broadcaster Transmitter Deck -->
+  <!-- Broadcaster Deck -->
   <div class="card" id="broadcasterCard">
     <div class="group-label">
-      <span>Broadcast Transmitter Deck</span>
+      <span>Broadcast Transmitter</span>
       <span id="listenerCountText" class="hidden">Listeners: <strong id="listenerCount">0</strong></span>
     </div>
     
     <div class="visualizer-container" id="visualizer"></div>
 
     <div id="broadcastPreStart" class="flex-row">
-      <input type="text" id="stationNameInput" placeholder="Station / Host Name (e.g. JazzRadio)" />
-      <button class="primary" id="startBroadcastBtn">Start Live Broadcast</button>
+      <input type="text" id="stationNameInput" placeholder="Station / Host Name" autocomplete="off" autocorrect="off" />
+      <button class="primary" id="startBroadcastBtn">Go Live</button>
     </div>
 
     <div id="broadcastControls" class="flex-row hidden" style="flex-wrap: wrap; margin-top: 8px;">
-      <button id="pauseBroadcastBtn">Pause Broadcast</button>
-      <button id="muteBtn">Mute Mic</button>
-      <button id="recordBroadcasterBtn">Record Broadcast</button>
-      <button id="stopSessionBtn" class="danger">Stop Station</button>
+      <button id="pauseBroadcastBtn" style="flex: 1 1 calc(50% - 4px);">Pause</button>
+      <button id="muteBtn" style="flex: 1 1 calc(50% - 4px);">Mute Mic</button>
+      <button id="recordBroadcasterBtn" style="flex: 1 1 calc(50% - 4px);">Record</button>
+      <button id="stopSessionBtn" class="danger" style="flex: 1 1 calc(50% - 4px);">Stop Station</button>
     </div>
   </div>
 
-  <!-- Listener Player Deck -->
+  <!-- Listener Deck -->
   <div class="card hidden" id="listenerCard">
     <div class="group-label">
       <span>Tuned In: <strong id="currentStationTitle">Station</strong></span>
       <span class="badge live" id="stationStateBadge">LIVE</span>
     </div>
-    <div class="flex-row" style="margin-top: 8px;">
-      <button class="primary" id="listenerPlayPauseBtn">Pause</button>
-      <button id="listenerMuteBtn">Mute</button>
-      <button id="recordListenerBtn">Record Stream</button>
-      <button class="danger" id="tuneOutBtn">Tune Out</button>
+    <div class="flex-row" style="margin-top: 8px; flex-wrap: wrap;">
+      <button class="primary" id="listenerPlayPauseBtn" style="flex: 1 1 calc(50% - 4px);">Pause</button>
+      <button id="listenerMuteBtn" style="flex: 1 1 calc(50% - 4px);">Mute</button>
+      <button id="recordListenerBtn" style="flex: 1 1 calc(50% - 4px);">Record</button>
+      <button class="danger" id="tuneOutBtn" style="flex: 1 1 calc(50% - 4px);">Tune Out</button>
     </div>
   </div>
 
-  <!-- Instant Live Directory -->
+  <!-- Live Stations Directory -->
   <div class="card">
     <div class="group-label">
-      <span>Live Radio Stations</span>
-      <button id="refreshStationsBtn" style="font-size: 0.7rem; padding: 2px 8px;">Refresh</button>
+      <span>Live Stations</span>
+      <button id="refreshStationsBtn" style="min-height: 32px; min-width: 32px; font-size: 0.75rem; padding: 0 10px;">Refresh</button>
     </div>
     <ul class="item-list" id="stationList">
       <li><span>Scanning radio frequencies...</span></li>
@@ -127,13 +354,15 @@
   </div>
 </div>
 
-<!-- Native Audio Playback Engine -->
+<!-- Primary Stream Element -->
 <audio id="remoteAudio" autoplay playsinline></audio>
+
+<!-- Background Keep-Alive Audio Element for iOS Safari -->
+<audio id="silentKeepAlive" loop playsinline src="data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQAAAAA="></audio>
 
 <script>
   /**
    * CONFIGURATION
-   * Paste your active Google Apps Script Web App URL below:
    */
   const GAS_SIGNALING_URL = "https://script.google.com/macros/s/AKfycbzXZKXYms6i2L9G30PATMmf4A0cG4V57EiMHb2NvbJRfqioPCHxXKyvJIX8PXj5t-Ll/exec";
 
@@ -144,7 +373,7 @@
     ]
   };
 
-  // Persistent Transparent User Identity
+  // Persistent User Identity
   let currentUser = localStorage.getItem("p2p_radio_user");
   if (!currentUser) {
     currentUser = "user_" + Math.random().toString(36).substring(2, 8);
@@ -167,33 +396,29 @@
   let animFrameId = null;
   let lastSyncTimestamp = 0;
 
-  // Concurrency Guards
-  let isPollingActive = false;
-  let pollTimeoutId = null;
-  let activePollInterval = 500;
-
-  // Broadcaster States
+  // Broadcaster states
   let isMicMuted = false;
   let isBroadcastPaused = false;
   let broadcasterRecorder = null;
   let broadcasterRecordedChunks = [];
 
-  // Listener States
+  // Listener states
   let isRemoteMuted = false;
   let isPlaybackPaused = false;
   let listenerRecorder = null;
   let listenerRecordedChunks = [];
 
-  // DOM Elements
+  // DOM Handles
   const statusDot = document.getElementById("statusDot");
   const statusText = document.getElementById("statusText");
   const channelBadge = document.getElementById("channelBadge");
   const stationList = document.getElementById("stationList");
   const refreshStationsBtn = document.getElementById("refreshStationsBtn");
   const remoteAudio = document.getElementById("remoteAudio");
+  const silentKeepAlive = document.getElementById("silentKeepAlive");
   const visualizerContainer = document.getElementById("visualizer");
 
-  // Broadcaster DOM Elements
+  // Broadcaster DOM
   const broadcasterCard = document.getElementById("broadcasterCard");
   const broadcastPreStart = document.getElementById("broadcastPreStart");
   const broadcastControls = document.getElementById("broadcastControls");
@@ -206,7 +431,7 @@
   const listenerCountText = document.getElementById("listenerCountText");
   const listenerCountDisplay = document.getElementById("listenerCount");
 
-  // Listener DOM Elements
+  // Listener DOM
   const listenerCard = document.getElementById("listenerCard");
   const currentStationTitle = document.getElementById("currentStationTitle");
   const stationStateBadge = document.getElementById("stationStateBadge");
@@ -240,8 +465,68 @@
   }
 
   // ==========================================
-  // 1. ROBUST SIGNALING API CLIENT
+  // 1. BACKGROUND AUDIO RETENTION & KEEP-ALIVE
   // ==========================================
+  function activateKeepAlive(stationTitle) {
+    // Prime the silent loop inside user interaction context
+    silentKeepAlive.play().catch(() => {});
+
+    if ('mediaSession' in navigator) {
+      navigator.mediaSession.metadata = new MediaMetadata({
+        title: stationTitle ? stationTitle.replace('station_', '') : 'Live Broadcast',
+        artist: 'P2P Voice Radio',
+        album: 'Live Stream'
+      });
+      navigator.mediaSession.playbackState = 'playing';
+      navigator.mediaSession.setActionHandler('play', () => {
+        if (activeRole === 'listener') {
+          remoteAudio.play().catch(() => {});
+          listenerPlayPauseBtn.innerText = "Pause";
+          isPlaybackPaused = false;
+        }
+      });
+      navigator.mediaSession.setActionHandler('pause', () => {
+        if (activeRole === 'listener') {
+          remoteAudio.pause();
+          listenerPlayPauseBtn.innerText = "Play";
+          isPlaybackPaused = true;
+        }
+      });
+    }
+  }
+
+  // ==========================================
+  // 2. WEB WORKER BACKGROUND SIGNALING ENGINE
+  // ==========================================
+  const workerBlobCode = `
+    let timer = null;
+    self.onmessage = function(e) {
+      if (e.data.action === 'start') {
+        if (timer) clearInterval(timer);
+        timer = setInterval(() => self.postMessage({ type: 'tick' }), e.data.interval || 800);
+      } else if (e.data.action === 'stop') {
+        if (timer) clearInterval(timer);
+        timer = null;
+      }
+    };
+  `;
+  const signalingWorker = new Worker(URL.createObjectURL(new Blob([workerBlobCode], { type: 'application/javascript' })));
+
+  signalingWorker.onmessage = async (e) => {
+    if (e.data.type === 'tick') {
+      await executePollCycle();
+    }
+  };
+
+  function startSignalingWorker(intervalMs) {
+    signalingWorker.postMessage({ action: 'start', interval: intervalMs });
+  }
+
+  function stopSignalingWorker() {
+    signalingWorker.postMessage({ action: 'stop' });
+  }
+
+  // Signaling Fetch Client
   async function apiCall(action, payload = {}, retries = 2) {
     const body = { action, username: currentUser, ...payload };
     const formData = new URLSearchParams();
@@ -256,7 +541,7 @@
     for (let attempt = 0; attempt <= retries; attempt++) {
       try {
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 6000); // 6s network cutoff
+        const timeoutId = setTimeout(() => controller.abort(), 6000);
 
         const res = await fetch(GAS_SIGNALING_URL, {
           method: "POST",
@@ -266,29 +551,40 @@
         });
         clearTimeout(timeoutId);
 
-        const data = await res.json();
-        return data;
+        return await res.json();
       } catch (err) {
         if (attempt === retries) {
-          console.warn(`Signaling action "${action}" failed:`, err);
           return { status: "error", message: err.toString() };
         }
-        await new Promise(r => setTimeout(r, 400));
+        await new Promise(r => setTimeout(r, 300));
       }
     }
   }
 
-  // SDP Opus Stereo Inserter
-  function forceStereoSDP(sdp) {
-    return sdp.replace(/a=fmtp:111 ((?:(?!minptime).)*)\r\n/g, (match, p1) => {
-      let params = p1;
-      if (!params.includes("stereo=1")) params += ";stereo=1;sprop-stereo=1";
-      if (!params.includes("maxaveragebitrate=")) params += ";maxaveragebitrate=128000";
-      return `a=fmtp:111 ${params}\r\n`;
-    });
+  // Safe Safari SDP Opus Stereo Inserter
+  function safelyInjectStereoSDP(sdp) {
+    try {
+      const match = sdp.match(/a=rtpmap:(\d+)\s+opus\/48000\/2/i);
+      if (!match) return sdp;
+      const pt = match[1];
+      const fmtpRegex = new RegExp(`a=fmtp:${pt}\\s+(.+?)\\r\\n`, 'i');
+      if (fmtpRegex.test(sdp)) {
+        return sdp.replace(fmtpRegex, (line, existing) => {
+          let updated = existing;
+          if (!updated.includes("stereo=")) updated += ";stereo=1;sprop-stereo=1";
+          if (!updated.includes("maxaveragebitrate=")) updated += ";maxaveragebitrate=128000";
+          return `a=fmtp:${pt} ${updated}\r\n`;
+        });
+      } else {
+        return sdp.replace(match[0] + '\r\n', `${match[0]}\r\na=fmtp:${pt} stereo=1;sprop-stereo=1;maxaveragebitrate=128000\r\n`);
+      }
+    } catch (e) {
+      console.warn("SDP stereo injection skipped:", e);
+      return sdp;
+    }
   }
 
-  // Audio Context & Visualizer Pipeline
+  // Audio Context & Hardware Capture
   function initVisualizer(stream) {
     if (!audioContext) {
       audioContext = new (window.AudioContext || window.webkitAudioContext)();
@@ -314,10 +610,10 @@
     render();
   }
 
-  // Dual-Mic Stereo Capture with Resilient Fallback
   async function captureMicrophone() {
     if (!localAudioStream) {
       try {
+        // Attempt dual-channel stereo capture
         localAudioStream = await navigator.mediaDevices.getUserMedia({
           audio: {
             channelCount: 2,
@@ -328,9 +624,15 @@
           video: false
         });
       } catch (e) {
-        // Fallback to standard mono capture if dual-channel is rejected by hardware
-        console.warn("Hardware stereo constraints rejected, falling back to default mic:", e);
-        localAudioStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+        // Graceful fallback for Safari / mobile mono hardware
+        localAudioStream = await navigator.mediaDevices.getUserMedia({
+          audio: {
+            echoCancellation: true,
+            noiseSuppression: true,
+            autoGainControl: true
+          },
+          video: false
+        });
       }
 
       const track = localAudioStream.getAudioTracks()[0];
@@ -343,7 +645,7 @@
   }
 
   // ==========================================
-  // 2. BROADCASTER ACTIONS
+  // 3. BROADCASTER ACTIONS
   // ==========================================
   startBroadcastBtn.onclick = async () => {
     let stationName = stationNameInput.value.trim();
@@ -361,6 +663,8 @@
       return alert("Microphone access failed: " + e.message);
     }
 
+    activateKeepAlive(stationName);
+
     currentStationId = "station_" + stationName.replace(/[^a-zA-Z0-9_-]/g, '_');
     activeRole = "broadcaster";
 
@@ -374,7 +678,7 @@
       alert("Unable to register station: " + res.message);
       return resetSessionState();
     }
-    startDynamicPolling(800);
+    startSignalingWorker(800);
   };
 
   pauseBroadcastBtn.onclick = async () => {
@@ -382,7 +686,7 @@
     isBroadcastPaused = !isBroadcastPaused;
     localAudioStream.getAudioTracks().forEach(t => t.enabled = !isBroadcastPaused);
 
-    pauseBroadcastBtn.innerText = isBroadcastPaused ? "Resume Broadcast" : "Pause Broadcast";
+    pauseBroadcastBtn.innerText = isBroadcastPaused ? "Resume" : "Pause";
     pauseBroadcastBtn.className = isBroadcastPaused ? "danger" : "";
     setStatus(isBroadcastPaused ? "paused" : "live", isBroadcastPaused ? "Paused" : "On-Air");
 
@@ -404,7 +708,7 @@
     if (!localAudioStream) return;
     if (broadcasterRecorder && broadcasterRecorder.state === "recording") {
       broadcasterRecorder.stop();
-      recordBroadcasterBtn.innerText = "Record Broadcast";
+      recordBroadcasterBtn.innerText = "Record";
       recordBroadcasterBtn.classList.remove("recording");
     } else {
       broadcasterRecordedChunks = [];
@@ -426,7 +730,7 @@
       };
 
       broadcasterRecorder.start();
-      recordBroadcasterBtn.innerText = "Stop Recording";
+      recordBroadcasterBtn.innerText = "Stop";
       recordBroadcasterBtn.classList.add("recording");
     }
   };
@@ -439,12 +743,16 @@
     const pc = new RTCPeerConnection(RTC_CONFIG);
     broadcasterPeerConnections[listenerUser] = pc;
 
+    // Explicit transceiver configuration for Safari/WebKit compatibility
     if (localAudioStream) {
-      localAudioStream.getTracks().forEach(track => pc.addTrack(track, localAudioStream));
+      localAudioStream.getTracks().forEach(track => {
+        pc.addTransceiver(track, { direction: 'sendonly', streams: [localAudioStream] });
+      });
     }
 
     pc.onicecandidate = (event) => {
-      if (event.candidate) {
+      // Validate candidate to filter empty end-of-candidate payloads
+      if (event.candidate && event.candidate.candidate) {
         apiCall("post_ice", { stationId: currentStationId, toUser: listenerUser, payload: event.candidate });
       }
     };
@@ -459,26 +767,32 @@
     };
 
     const rawOffer = await pc.createOffer();
-    const stereoOffer = new RTCSessionDescription({
-      type: rawOffer.type,
-      sdp: forceStereoSDP(rawOffer.sdp)
-    });
-    await pc.setLocalDescription(stereoOffer);
+    let finalOffer = rawOffer;
+
+    try {
+      const modifiedSdp = safelyInjectStereoSDP(rawOffer.sdp);
+      const testDesc = new RTCSessionDescription({ type: rawOffer.type, sdp: modifiedSdp });
+      await pc.setLocalDescription(testDesc);
+      finalOffer = testDesc;
+    } catch (e) {
+      console.warn("Safari rejected mutated SDP; falling back to raw offer:", e);
+      await pc.setLocalDescription(rawOffer);
+      finalOffer = rawOffer;
+    }
 
     await apiCall("post_offer", {
       stationId: currentStationId,
       toUser: listenerUser,
-      payload: stereoOffer
+      payload: finalOffer
     });
   }
 
   function updateListenerCount() {
-    const count = Object.keys(broadcasterPeerConnections).length;
-    listenerCountDisplay.innerText = count;
+    listenerCountDisplay.innerText = Object.keys(broadcasterPeerConnections).length;
   }
 
   // ==========================================
-  // 3. LISTENER ACTIONS & TUNE-IN
+  // 4. LISTENER ACTIONS & TUNE-IN
   // ==========================================
   async function fetchStations() {
     refreshStationsBtn.disabled = true;
@@ -503,21 +817,20 @@
                   <span class="${statusClass}">${s.status === "live" ? "LIVE" : "PAUSED"}</span>
                 </div>
                 <div>
-                  ${isMe ? '<span class="badge">Your Station</span>' : `<button class="primary" style="padding: 4px 12px; font-size: 0.75rem;" onclick="tuneIntoStation('${s.stationId}', '${s.broadcaster}', ${s.stereo})">Tune In</button>`}
+                  ${isMe ? '<span class="badge">Your Station</span>' : `<button class="primary" style="min-height: 40px; padding: 0 14px; font-size: 0.8rem;" onclick="tuneIntoStation('${s.stationId}', '${s.broadcaster}', ${s.stereo})">Tune In</button>`}
                 </div>
               </li>
             `;
           }).join("");
       }
     } else {
-      stationList.innerHTML = "<li><span style='color: var(--warn);'>Could not load stations. Retrying...</span></li>";
-      setTimeout(fetchStations, 3000);
+      stationList.innerHTML = "<li><span style='color: var(--warn);'>Failed to load stations.</span></li>";
     }
   }
   refreshStationsBtn.onclick = fetchStations;
 
   window.tuneIntoStation = async (stationId, broadcaster, isStereo) => {
-    // Immediate audio engine unlock for Safari & Chrome autoplay compliance
+    // Immediate audio engine unlock for Safari & Chrome
     if (!audioContext) {
       audioContext = new (window.AudioContext || window.webkitAudioContext)();
     }
@@ -525,6 +838,8 @@
       audioContext.resume();
     }
     remoteAudio.play().catch(() => {});
+
+    activateKeepAlive(stationId);
 
     currentStationId = stationId;
     targetBroadcaster = broadcaster;
@@ -536,7 +851,6 @@
     setChannelBadge(isStereo);
     setStatus("signaling", "Tuning in...");
 
-    // Send instant tune-in intent
     const res = await apiCall("tune_in", { stationId: currentStationId });
     if (!res || res.status !== "success") {
       alert("Tune-in failed: " + (res ? res.message : "Network error"));
@@ -544,13 +858,14 @@
     }
 
     setupListenerPeerConnection(broadcaster);
-    startDynamicPolling(850); // High-speed dynamic loop during initial handshake
+    startSignalingWorker(800);
   };
 
   function setupListenerPeerConnection(broadcaster) {
     if (listenerPeerConnection) listenerPeerConnection.close();
     listenerPeerConnection = new RTCPeerConnection(RTC_CONFIG);
 
+    // Explicit recvonly transceiver declaration for Unified-Plan
     listenerPeerConnection.addTransceiver('audio', { direction: 'recvonly' });
 
     listenerPeerConnection.ontrack = (event) => {
@@ -562,17 +877,17 @@
     };
 
     listenerPeerConnection.onicecandidate = (event) => {
-      if (event.candidate) {
+      if (event.candidate && event.candidate.candidate) {
         apiCall("post_ice", { stationId: currentStationId, toUser: broadcaster, payload: event.candidate });
       }
     };
 
     listenerPeerConnection.oniceconnectionstatechange = () => {
       const st = listenerPeerConnection.iceConnectionState;
-      if (st === "checking") setStatus("connecting", "Negotiating...");
+      if (st === "checking") setStatus("connecting", "Connecting...");
       if (st === "connected" || st === "completed") {
         setStatus("live", "Tuned In");
-        startDynamicPolling(2000); // Handshake complete, throttle back to 2000ms
+        startSignalingWorker(2000); // Connection established, throttle worker
       }
       if (["disconnected", "failed", "closed"].includes(st)) {
         setStatus("", "Disconnected");
@@ -599,10 +914,10 @@
   };
 
   recordListenerBtn.onclick = () => {
-    if (!remoteAudio.srcObject) return alert("No active audio stream to record.");
+    if (!remoteAudio.srcObject) return alert("No active stream to record.");
     if (listenerRecorder && listenerRecorder.state === "recording") {
       listenerRecorder.stop();
-      recordListenerBtn.innerText = "Record Stream";
+      recordListenerBtn.innerText = "Record";
       recordListenerBtn.classList.remove("recording");
     } else {
       listenerRecordedChunks = [];
@@ -624,108 +939,102 @@
       };
 
       listenerRecorder.start();
-      recordListenerBtn.innerText = "Stop Recording";
+      recordListenerBtn.innerText = "Stop";
       recordListenerBtn.classList.add("recording");
     }
   };
 
   // ==========================================
-  // 4. NON-OVERLAPPING DYNAMIC SIGNALING ENGINE
+  // 5. ASYNC SIGNALING LOOP (Invoked by Worker)
   // ==========================================
-  function startDynamicPolling(intervalMs) {
-    activePollInterval = intervalMs;
-    if (pollTimeoutId) clearTimeout(pollTimeoutId);
+  let isExecutingCycle = false;
+  async function executePollCycle() {
+    if (!currentStationId || isExecutingCycle) return;
+    isExecutingCycle = true;
 
-    const runPollCycle = async () => {
-      if (!currentStationId) return;
-      if (isPollingActive) {
-        pollTimeoutId = setTimeout(runPollCycle, activePollInterval);
-        return;
-      }
+    try {
+      const res = await apiCall("poll_signaling", { stationId: currentStationId, since: lastSyncTimestamp });
+      if (res && res.status === "success") {
+        lastSyncTimestamp = res.serverTime;
 
-      isPollingActive = true;
-      try {
-        const res = await apiCall("poll_signaling", { stationId: currentStationId, since: lastSyncTimestamp });
-        if (res && res.status === "success") {
-          lastSyncTimestamp = res.serverTime;
-
-          // Broadcaster Pipeline
-          if (activeRole === "broadcaster") {
-            if (res.newListeners && res.newListeners.length > 0) {
-              for (const item of res.newListeners) {
-                const listener = item.listener;
-                if (!broadcasterPeerConnections[listener]) {
-                  await setupBroadcasterPeer(listener);
-                }
-              }
-            }
-            if (res.answers && res.answers.length > 0) {
-              for (const item of res.answers) {
-                const pc = broadcasterPeerConnections[item.from];
-                if (pc && pc.signalingState === "have-local-offer") {
-                  await pc.setRemoteDescription(new RTCSessionDescription(item.payload));
-                }
-              }
-            }
-            if (res.ice && res.ice.length > 0) {
-              for (const item of res.ice) {
-                const pc = broadcasterPeerConnections[item.from];
-                if (pc) {
-                  try { await pc.addIceCandidate(new RTCIceCandidate(item.candidate)); } catch (e) {}
-                }
+        // Broadcaster Inbound Pipeline
+        if (activeRole === "broadcaster") {
+          if (res.newListeners && res.newListeners.length > 0) {
+            for (const item of res.newListeners) {
+              const listener = item.listener;
+              if (!broadcasterPeerConnections[listener]) {
+                await setupBroadcasterPeer(listener);
               }
             }
           }
-
-          // Listener Pipeline
-          if (activeRole === "listener") {
-            if (res.stationState === "station_paused") {
-              stationStateBadge.innerText = "PAUSED";
-              stationStateBadge.className = "badge paused";
-            } else {
-              stationStateBadge.innerText = "LIVE";
-              stationStateBadge.className = "badge live";
-            }
-
-            if (res.offers && res.offers.length > 0) {
-              for (const item of res.offers) {
-                if (item.from === targetBroadcaster && listenerPeerConnection && listenerPeerConnection.signalingState === "stable") {
-                  await listenerPeerConnection.setRemoteDescription(new RTCSessionDescription(item.payload));
-                  const rawAnswer = await listenerPeerConnection.createAnswer();
-                  const stereoAnswer = new RTCSessionDescription({
-                    type: rawAnswer.type,
-                    sdp: forceStereoSDP(rawAnswer.sdp)
-                  });
-                  await listenerPeerConnection.setLocalDescription(stereoAnswer);
-                  await apiCall("post_answer", {
-                    stationId: currentStationId,
-                    toUser: targetBroadcaster,
-                    payload: stereoAnswer
-                  });
-                }
+          if (res.answers && res.answers.length > 0) {
+            for (const item of res.answers) {
+              const pc = broadcasterPeerConnections[item.from];
+              if (pc && pc.signalingState === "have-local-offer") {
+                await pc.setRemoteDescription(new RTCSessionDescription(item.payload));
               }
             }
-
-            if (res.ice && res.ice.length > 0) {
-              for (const item of res.ice) {
-                if (item.from === targetBroadcaster && listenerPeerConnection) {
-                  try { await listenerPeerConnection.addIceCandidate(new RTCIceCandidate(item.candidate)); } catch (e) {}
-                }
+          }
+          if (res.ice && res.ice.length > 0) {
+            for (const item of res.ice) {
+              const pc = broadcasterPeerConnections[item.from];
+              if (pc && item.candidate && item.candidate.candidate) {
+                try { await pc.addIceCandidate(new RTCIceCandidate(item.candidate)); } catch (e) {}
               }
             }
           }
         }
-      } catch (err) {
-        console.warn("Poll cycle warning:", err);
-      } finally {
-        isPollingActive = false;
-        if (currentStationId) {
-          pollTimeoutId = setTimeout(runPollCycle, activePollInterval);
+
+        // Listener Inbound Pipeline
+        if (activeRole === "listener") {
+          if (res.stationState === "station_paused") {
+            stationStateBadge.innerText = "PAUSED";
+            stationStateBadge.className = "badge paused";
+          } else {
+            stationStateBadge.innerText = "LIVE";
+            stationStateBadge.className = "badge live";
+          }
+
+          if (res.offers && res.offers.length > 0) {
+            for (const item of res.offers) {
+              if (item.from === targetBroadcaster && listenerPeerConnection && listenerPeerConnection.signalingState === "stable") {
+                await listenerPeerConnection.setRemoteDescription(new RTCSessionDescription(item.payload));
+                const rawAnswer = await listenerPeerConnection.createAnswer();
+                let finalAnswer = rawAnswer;
+
+                try {
+                  const stereoSdp = safelyInjectStereoSDP(rawAnswer.sdp);
+                  const testAnswer = new RTCSessionDescription({ type: rawAnswer.type, sdp: stereoSdp });
+                  await listenerPeerConnection.setLocalDescription(testAnswer);
+                  finalAnswer = testAnswer;
+                } catch (e) {
+                  await listenerPeerConnection.setLocalDescription(rawAnswer);
+                  finalAnswer = rawAnswer;
+                }
+
+                await apiCall("post_answer", {
+                  stationId: currentStationId,
+                  toUser: targetBroadcaster,
+                  payload: finalAnswer
+                });
+              }
+            }
+          }
+
+          if (res.ice && res.ice.length > 0) {
+            for (const item of res.ice) {
+              if (item.from === targetBroadcaster && listenerPeerConnection && item.candidate && item.candidate.candidate) {
+                try { await listenerPeerConnection.addIceCandidate(new RTCIceCandidate(item.candidate)); } catch (e) {}
+              }
+            }
+          }
         }
       }
-    };
-
-    pollTimeoutId = setTimeout(runPollCycle, 50);
+    } catch (err) {
+      console.warn("Poll cycle exception:", err);
+    } finally {
+      isExecutingCycle = false;
+    }
   }
 
   // Teardown
@@ -733,9 +1042,12 @@
   tuneOutBtn.onclick = resetSessionState;
 
   async function resetSessionState() {
-    if (pollTimeoutId) clearTimeout(pollTimeoutId);
+    stopSignalingWorker();
     if (animFrameId) cancelAnimationFrame(animFrameId);
-    isPollingActive = false;
+    isExecutingCycle = false;
+
+    silentKeepAlive.pause();
+    silentKeepAlive.currentTime = 0;
 
     if (broadcasterRecorder && broadcasterRecorder.state === "recording") broadcasterRecorder.stop();
     if (listenerRecorder && listenerRecorder.state === "recording") listenerRecorder.stop();
@@ -771,13 +1083,13 @@
     listenerCard.classList.add("hidden");
     startBroadcastBtn.disabled = false;
 
-    pauseBroadcastBtn.innerText = "Pause Broadcast";
+    pauseBroadcastBtn.innerText = "Pause";
     pauseBroadcastBtn.className = "";
     muteBtn.innerText = "Mute Mic";
     muteBtn.className = "";
-    recordBroadcasterBtn.innerText = "Record Broadcast";
+    recordBroadcasterBtn.innerText = "Record";
     recordBroadcasterBtn.classList.remove("recording");
-    recordListenerBtn.innerText = "Record Stream";
+    recordListenerBtn.innerText = "Record";
     recordListenerBtn.classList.remove("recording");
 
     currentStationId = null;
@@ -794,7 +1106,6 @@
     fetchStations();
   }
 
-  // Scan on Load
   window.addEventListener("load", () => {
     fetchStations();
   });
