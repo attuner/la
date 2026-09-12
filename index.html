@@ -374,7 +374,7 @@
       alert("Unable to register station: " + res.message);
       return resetSessionState();
     }
-    startDynamicPolling(500);
+    startDynamicPolling(800);
   };
 
   pauseBroadcastBtn.onclick = async () => {
@@ -544,7 +544,7 @@
     }
 
     setupListenerPeerConnection(broadcaster);
-    startDynamicPolling(450); // High-speed dynamic loop during initial handshake
+    startDynamicPolling(850); // High-speed dynamic loop during initial handshake
   };
 
   function setupListenerPeerConnection(broadcaster) {
