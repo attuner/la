@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Ephemeral P2P Live Audio</title>
+  <title>P2P Broadcast Audio & Access Gate</title>
   <style>
     :root {
       --bg: #0d1117;
@@ -13,104 +13,109 @@
       --accent-hover: #2ea043;
       --danger: #da3633;
       --danger-hover: #f85149;
+      --warn: #d29922;
       --text: #c9d1d9;
       --text-bright: #ffffff;
       --muted: #8b949e;
-      --indicator-off: #484f58;
-      --indicator-on: #3fb950;
-      --indicator-warn: #d29922;
     }
 
-    * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
     body { background: var(--bg); color: var(--text); min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 1.5rem; }
-    .container { width: 100%; max-width: 480px; background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 24px; box-shadow: 0 8px 24px rgba(0,0,0,0.5); }
-    
+    .container { width: 100%; max-width: 520px; background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 24px; box-shadow: 0 8px 24px rgba(0,0,0,0.6); }
+
     header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
     h1 { font-size: 1.25rem; font-weight: 600; color: var(--text-bright); }
-    .status-badge { display: flex; align-items: center; gap: 6px; font-size: 0.75rem; text-transform: uppercase; font-weight: 700; letter-spacing: 0.05em; padding: 4px 8px; border-radius: 999px; background: #21262d; border: 1px solid var(--border); }
-    .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--indicator-off); }
-    .dot.signaling { background: var(--indicator-warn); animation: pulse 1s infinite alternate; }
-    .dot.connecting { background: var(--indicator-warn); animation: pulse 0.5s infinite alternate; }
-    .dot.live { background: var(--indicator-on); box-shadow: 0 0 8px var(--indicator-on); }
-    
-    @keyframes pulse { from { opacity: 0.4; } to { opacity: 1; } }
+    .status-badge { display: flex; align-items: center; gap: 6px; font-size: 0.75rem; text-transform: uppercase; font-weight: 700; padding: 4px 8px; border-radius: 999px; background: #21262d; border: 1px solid var(--border); }
+    .dot { width: 8px; height: 8px; border-radius: 50%; background: #484f58; }
+    .dot.signaling { background: var(--warn); animation: pulse 1s infinite alternate; }
+    .dot.connecting { background: var(--warn); animation: pulse 0.5s infinite alternate; }
+    .dot.live { background: #3fb950; box-shadow: 0 0 8px #3fb950; }
+    @keyframes pulse { from { opacity: 0.3; } to { opacity: 1; } }
 
     .card { background: #0d1117; border: 1px solid var(--border); border-radius: 8px; padding: 16px; margin-bottom: 16px; }
     .group-label { font-size: 0.75rem; color: var(--muted); text-transform: uppercase; margin-bottom: 8px; font-weight: 600; }
-    .flex-row { display: flex; gap: 8px; }
+    .flex-row { display: flex; gap: 8px; align-items: center; }
     
-    input[type="text"] { flex: 1; background: #161b22; border: 1px solid var(--border); border-radius: 6px; padding: 8px 12px; color: var(--text); font-size: 0.9rem; outline: none; }
-    input[type="text"]:focus { border-color: #58a6ff; }
+    input[type="text"], input[type="password"] { flex: 1; background: #161b22; border: 1px solid var(--border); border-radius: 6px; padding: 8px 12px; color: var(--text); font-size: 0.9rem; outline: none; }
+    input[type="text"]:focus, input[type="password"]:focus { border-color: #58a6ff; }
 
-    button { background: #21262d; border: 1px solid var(--border); color: var(--text-bright); padding: 8px 14px; border-radius: 6px; font-size: 0.9rem; font-weight: 500; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; transition: background 0.15s ease; }
+    button { background: #21262d; border: 1px solid var(--border); color: var(--text-bright); padding: 8px 14px; border-radius: 6px; font-size: 0.85rem; font-weight: 500; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; gap: 6px; transition: background 0.15s ease; }
     button:hover:not(:disabled) { background: #30363d; }
     button.primary { background: var(--accent); border-color: rgba(255,255,255,0.1); }
     button.primary:hover:not(:disabled) { background: var(--accent-hover); }
     button.danger { background: var(--danger); border-color: rgba(255,255,255,0.1); }
     button.danger:hover:not(:disabled) { background: var(--danger-hover); }
-    button:disabled { opacity: 0.5; cursor: not-allowed; }
+    button:disabled { opacity: 0.45; cursor: not-allowed; }
 
-    .visualizer-container { height: 40px; width: 100%; display: flex; align-items: flex-end; gap: 3px; margin: 12px 0; background: #010409; padding: 6px; border-radius: 6px; }
-    .visualizer-bar { flex: 1; background: #238636; min-height: 2px; height: 2px; border-radius: 2px; transition: height 0.05s ease; }
+    .visualizer-container { height: 38px; width: 100%; display: flex; align-items: flex-end; gap: 3px; margin: 10px 0; background: #010409; padding: 5px; border-radius: 6px; }
+    .visualizer-bar { flex: 1; background: #238636; min-height: 2px; height: 2px; border-radius: 2px; }
 
-    .peer-list { list-style: none; font-size: 0.85rem; color: var(--muted); max-height: 100px; overflow-y: auto; }
-    .peer-list li { display: flex; justify-content: space-between; padding: 4px 0; border-bottom: 1px dotted var(--border); }
-    .peer-list li:last-child { border-bottom: none; }
+    .item-list { list-style: none; font-size: 0.85rem; color: var(--muted); max-height: 140px; overflow-y: auto; }
+    .item-list li { display: flex; justify-content: space-between; align-items: center; padding: 6px 0; border-bottom: 1px dotted var(--border); }
+    .item-list li:last-child { border-bottom: none; }
     
-    .privacy-notice { font-size: 0.7rem; color: var(--muted); text-align: center; margin-top: 12px; line-height: 1.4; }
+    .approval-banner { background: #2d2206; border: 1px solid var(--warn); padding: 10px 12px; border-radius: 6px; margin-bottom: 12px; font-size: 0.85rem; display: flex; justify-content: space-between; align-items: center; }
+    .audio-fallback-btn { width: 100%; background: #1f6feb; border-color: #388bfd; margin-top: 10px; padding: 10px; font-weight: bold; }
+    .hidden { display: none !important; }
   </style>
 </head>
 <body>
 
 <div class="container">
   <header>
-    <h1>P2P Audio Bridge</h1>
+    <h1>P2P Voice Switchboard</h1>
     <div class="status-badge">
       <span class="dot" id="statusDot"></span>
-      <span id="statusText">Disconnected</span>
+      <span id="statusText">Guest</span>
     </div>
   </header>
 
-  <!-- Step 1: Room Setup -->
-  <div class="card" id="roomSection">
-    <div class="group-label">Room Operations</div>
+  <!-- Auth Panel -->
+  <div class="card" id="authSection">
+    <div class="group-label">Authentication</div>
     <div class="flex-row" style="margin-bottom: 8px;">
-      <button class="primary" id="createBtn" style="flex: 1;">Create Room</button>
-      <button id="copyBtn" style="display: none;">Copy Link</button>
+      <input type="text" id="authUsername" placeholder="Username" autocomplete="off" />
+      <input type="password" id="authPassword" placeholder="Password" />
     </div>
     <div class="flex-row">
-      <input type="text" id="roomIdInput" placeholder="Paste or enter Room ID" />
-      <button id="joinBtn">Join</button>
+      <button class="primary" id="loginBtn" style="flex: 1;">Log In</button>
+      <button id="registerBtn" style="flex: 1;">Register</button>
     </div>
   </div>
 
-  <!-- Step 2: Audio Engine Controls -->
-  <div class="card">
-    <div class="group-label">Microphone & Transmission</div>
-    <div class="visualizer-container" id="visualizer">
-      <!-- 20 Visualizer bars -->
-    </div>
-    <div class="flex-row">
-      <button id="micToggleBtn" class="primary" style="flex: 1;">Turn On Mic</button>
-      <button id="muteBtn" style="flex: 1;" disabled>Mute</button>
-      <button id="leaveBtn" class="danger" disabled>Leave</button>
-    </div>
-  </div>
+  <!-- Main App Shell -->
+  <div id="appSection" class="hidden">
+    <!-- Active Inbound Approval Requests (Broadcaster Only) -->
+    <div id="incomingRequestContainer"></div>
 
-  <!-- Step 3: Peer Monitoring -->
-  <div class="card">
-    <div class="group-label">Active Transceivers</div>
-    <ul class="peer-list" id="peerList">
-      <li><span>No peers detected</span></li>
-    </ul>
-  </div>
+    <!-- Interactive Autoplay Unlock Button -->
+    <button id="audioUnlockBtn" class="audio-fallback-btn hidden">Click To Enable & Listen to Audio</button>
 
-  <div class="privacy-notice">
-    🔒 <strong>Zero Data Retention:</strong> Audio tracks run strictly peer-to-peer via WebRTC MediaStreams. No audio data ever touches a storage server, database, or Google Apps Script.
+    <!-- Broadcaster Workbench -->
+    <div class="card">
+      <div class="group-label">Broadcaster Deck</div>
+      <div class="visualizer-container" id="visualizer"></div>
+      <div class="flex-row">
+        <button id="startBroadcastBtn" class="primary" style="flex: 1;">Go Live (Broadcast)</button>
+        <button id="muteBtn" disabled>Mute</button>
+        <button id="stopSessionBtn" class="danger" disabled>Stop / Leave</button>
+      </div>
+    </div>
+
+    <!-- Listener Directory -->
+    <div class="card">
+      <div class="group-label">Live Broadcaster Directory</div>
+      <ul class="item-list" id="broadcasterList">
+        <li><span>No active broadcasts detected</span></li>
+      </ul>
+      <div style="margin-top: 8px; text-align: right;">
+        <button id="refreshBroadcastsBtn" style="font-size: 0.75rem; padding: 4px 8px;">Refresh List</button>
+      </div>
+    </div>
   </div>
 </div>
 
-<!-- Hidden audio player for remote stream delivery -->
+<!-- Dedicated remote stream element -->
 <audio id="remoteAudio" autoplay playsinline></audio>
 
 <script>
@@ -127,223 +132,207 @@
     ]
   };
 
-  // State Management
-  let localStream = null;
-  let peerConnection = null;
+  // Auth & Session State
+  let currentUser = sessionStorage.getItem("p2p_user") || "";
+  let currentPass = sessionStorage.getItem("p2p_pass") || "";
+  let currentRoomId = null;
+  let activeRole = null; // 'broadcaster' | 'listener'
+  let targetBroadcaster = null;
+  let activePeerConnection = null;
+  let localAudioStream = null;
   let audioContext = null;
   let analyserNode = null;
   let animFrameId = null;
-  let pollInterval = null;
-  let lastIceTimestamp = 0;
-  
-  const peerId = "peer_" + Math.random().toString(36).substring(2, 9);
-  let currentRoomId = null;
-  let role = null; // 'caller' (room creator) or 'callee' (joiner)
+  let sessionTimer = null;
+  let lastSyncTimestamp = 0;
   let isMuted = false;
 
-  // DOM Elements
+  // DOM Handles
   const statusDot = document.getElementById("statusDot");
   const statusText = document.getElementById("statusText");
-  const roomIdInput = document.getElementById("roomIdInput");
-  const createBtn = document.getElementById("createBtn");
-  const joinBtn = document.getElementById("joinBtn");
-  const copyBtn = document.getElementById("copyBtn");
-  const micToggleBtn = document.getElementById("micToggleBtn");
+  const authSection = document.getElementById("authSection");
+  const appSection = document.getElementById("appSection");
+  const authUsername = document.getElementById("authUsername");
+  const authPassword = document.getElementById("authPassword");
+  const loginBtn = document.getElementById("loginBtn");
+  const registerBtn = document.getElementById("registerBtn");
+  const startBroadcastBtn = document.getElementById("startBroadcastBtn");
   const muteBtn = document.getElementById("muteBtn");
-  const leaveBtn = document.getElementById("leaveBtn");
-  const peerList = document.getElementById("peerList");
+  const stopSessionBtn = document.getElementById("stopSessionBtn");
+  const broadcasterList = document.getElementById("broadcasterList");
+  const refreshBroadcastsBtn = document.getElementById("refreshBroadcastsBtn");
+  const incomingRequestContainer = document.getElementById("incomingRequestContainer");
+  const audioUnlockBtn = document.getElementById("audioUnlockBtn");
   const remoteAudio = document.getElementById("remoteAudio");
   const visualizerContainer = document.getElementById("visualizer");
 
-  // Build visualizer bars
-  const NUM_BARS = 20;
+  // Create Visualizer Bars
+  const NUM_BARS = 22;
   const bars = [];
   for (let i = 0; i < NUM_BARS; i++) {
-    const bar = document.createElement("div");
-    bar.className = "visualizer-bar";
-    visualizerContainer.appendChild(bar);
-    bars.push(bar);
+    const b = document.createElement("div");
+    b.className = "visualizer-bar";
+    visualizerContainer.appendChild(b);
+    bars.push(b);
   }
 
-  // Handle URL Auto-fill
-  window.addEventListener("load", () => {
-    const params = new URLSearchParams(window.location.search);
-    const roomParam = params.get("room");
-    if (roomParam) {
-      roomIdInput.value = roomParam;
-    }
-  });
-
-  // UI Status Controller
-  function setStatus(state, message) {
+  function setStatus(state, text) {
     statusDot.className = "dot " + state;
-    statusText.innerText = message;
+    statusText.innerText = text;
   }
 
-  // Web Audio Visualizer Pipeline
+  // ==========================================
+  // 1. RELIABLE BACKEND COMMUNICATION
+  // Using URL-Encoded Form POST / GET to guarantee delivery past GAS CORS redirects
+  // ==========================================
+  async function apiCall(action, payload = {}) {
+    const body = {
+      action,
+      username: currentUser,
+      password: currentPass,
+      ...payload
+    };
+
+    // Serialize as standard application/x-www-form-urlencoded
+    const formData = new URLSearchParams();
+    for (const key in body) {
+      if (typeof body[key] === "object") {
+        formData.append(key, JSON.stringify(body[key]));
+      } else {
+        formData.append(key, body[key] || "");
+      }
+    }
+
+    try {
+      const res = await fetch(GAS_SIGNALING_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: formData.toString()
+      });
+      return await res.json();
+    } catch (err) {
+      console.warn("API request failure:", err);
+      return { status: "error", message: err.toString() };
+    }
+  }
+
+  // ==========================================
+  // 2. USER AUTHENTICATION PIPELINE
+  // ==========================================
+  registerBtn.onclick = async () => {
+    const u = authUsername.value.trim();
+    const p = authPassword.value;
+    if (!u || !p) return alert("Enter both username and password.");
+    registerBtn.disabled = true;
+    const res = await apiCall("register", { username: u, password: p });
+    registerBtn.disabled = false;
+    alert(res.message);
+  };
+
+  loginBtn.onclick = async () => {
+    const u = authUsername.value.trim();
+    const p = authPassword.value;
+    if (!u || !p) return alert("Enter username and password.");
+    loginBtn.disabled = true;
+    const res = await apiCall("login", { username: u, password: p });
+    loginBtn.disabled = false;
+
+    if (res.status === "success") {
+      currentUser = u;
+      currentPass = p;
+      sessionStorage.setItem("p2p_user", u);
+      sessionStorage.setItem("p2p_pass", p);
+      initAppUI();
+    } else {
+      alert("Auth Error: " + res.message);
+    }
+  };
+
+  function initAppUI() {
+    authSection.classList.add("hidden");
+    appSection.classList.remove("hidden");
+    setStatus("", currentUser);
+    fetchBroadcasts();
+  }
+
+  if (currentUser && currentPass) {
+    initAppUI();
+  }
+
+  // Audio Context & Visualizer Initializer
   function initVisualizer(stream) {
     if (!audioContext) {
       audioContext = new (window.AudioContext || window.webkitAudioContext)();
     }
     analyserNode = audioContext.createAnalyser();
     analyserNode.fftSize = 64;
-    const source = audioContext.createMediaStreamSource(stream);
-    source.connect(analyserNode);
+    const src = audioContext.createMediaStreamSource(stream);
+    src.connect(analyserNode);
 
-    const bufferLength = analyserNode.frequencyBinCount;
-    const dataArray = new Uint8Array(bufferLength);
-
+    const dataArray = new Uint8Array(analyserNode.frequencyBinCount);
     function render() {
       analyserNode.getByteFrequencyData(dataArray);
       for (let i = 0; i < NUM_BARS; i++) {
         const val = dataArray[i] || 0;
-        const percent = Math.min(100, Math.max(5, (val / 255) * 100));
-        bars[i].style.height = `${percent}%`;
+        const pct = Math.min(100, Math.max(5, (val / 255) * 100));
+        bars[i].style.height = pct + "%";
       }
       animFrameId = requestAnimationFrame(render);
     }
     render();
   }
 
-  // Audio Device Capture
-  async function initMicrophone() {
-    try {
-      if (!localStream) {
-        localStream = await navigator.mediaDevices.getUserMedia({ 
-          audio: {
-            echoCancellation: true,
-            noiseSuppression: true,
-            autoGainControl: true
-          }, 
-          video: false 
-        });
-        initVisualizer(localStream);
-        micToggleBtn.innerText = "Mic Active";
-        micToggleBtn.disabled = true;
-        muteBtn.disabled = false;
-      }
-      return true;
-    } catch (err) {
-      alert("Microphone Access Error: " + err.message);
-      return false;
-    }
-  }
-
-  // Signaling Network Client
-  async function signalPost(payload) {
-    try {
-      await fetch(GAS_SIGNALING_URL, {
-        method: "POST",
-        mode: "no-cors", // Standard cross-origin GAS delivery
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload)
+  async function captureMicrophone() {
+    if (!localAudioStream) {
+      localAudioStream = await navigator.mediaDevices.getUserMedia({
+        audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
+        video: false
       });
-    } catch (err) {
-      console.warn("Signaling POST Error:", err);
+      initVisualizer(localAudioStream);
     }
+    return localAudioStream;
   }
 
-  async function signalGet(params) {
+  // ==========================================
+  // 3. BROADCASTER & APPROVAL WORKFLOW
+  // ==========================================
+  startBroadcastBtn.onclick = async () => {
     try {
-      const url = new URL(GAS_SIGNALING_URL);
-      Object.keys(params).forEach(k => url.searchParams.append(k, params[k]));
-      const res = await fetch(url.toString());
-      return await res.json();
-    } catch (err) {
-      console.warn("Signaling GET Error:", err);
-      return null;
-    }
-  }
-
-  // WebRTC Core Initialization
-  function setupPeerConnection() {
-    peerConnection = new RTCPeerConnection(RTC_CONFIG);
-
-    // Mount tracks into PeerConnection
-    if (localStream) {
-      localStream.getTracks().forEach(track => peerConnection.addTrack(track, localStream));
+      await captureMicrophone();
+    } catch (e) {
+      return alert("Microphone permissions denied: " + e.message);
     }
 
-    // Capture dynamic incoming remote stream
-    peerConnection.ontrack = (event) => {
-      if (event.streams && event.streams[0]) {
-        remoteAudio.srcObject = event.streams[0];
-        // Attempt autoplay resolution for modern browser playback policies
-        remoteAudio.play().catch(() => {
-          window.addEventListener('click', () => remoteAudio.play(), { once: true });
-        });
-      }
-    };
+    currentRoomId = "room_" + currentUser;
+    activeRole = "broadcaster";
+    startBroadcastBtn.disabled = true;
+    muteBtn.disabled = false;
+    stopSessionBtn.disabled = false;
+    setStatus("live", "Broadcasting");
 
-    // Forward ICE Candidates to signaling sheet
-    peerConnection.onicecandidate = (event) => {
-      if (event.candidate) {
-        signalPost({
-          action: "post_ice",
-          roomId: currentRoomId,
-          peerId: peerId,
-          role: role,
-          payload: event.candidate
-        });
-      }
-    };
+    await apiCall("start_broadcast", { roomId: currentRoomId });
+    startBroadcasterLoop();
+  };
 
-    peerConnection.oniceconnectionstatechange = () => {
-      const s = peerConnection.iceConnectionState;
-      if (s === "checking") setStatus("connecting", "Connecting");
-      if (s === "connected" || s === "completed") {
-        setStatus("live", "Live P2P");
-        clearInterval(pollInterval); // Cease heavy polling once direct connection establishes
-      }
-      if (s === "disconnected" || s === "failed" || s === "closed") {
-        setStatus("", "Disconnected");
-      }
-    };
-  }
-
-  // Polling Engine (1.5s interval)
-  function startPolling() {
-    pollInterval = setInterval(async () => {
-      if (!currentRoomId) return;
-
-      // 1. Peer Presence
-      const peerData = await signalGet({ action: "get_peers", roomId: currentRoomId, peerId });
-      if (peerData && peerData.peers) {
-        peerList.innerHTML = peerData.peers.map(p => `<li><span>${p}</span><span>${p === peerId ? "(You)" : "Remote"}</span></li>`).join('');
+  function startBroadcasterLoop() {
+    sessionTimer = setInterval(async () => {
+      // 1. Check for incoming listen requests
+      const reqRes = await apiCall("poll_listen_requests", { roomId: currentRoomId });
+      if (reqRes.status === "success" && reqRes.requests.length > 0) {
+        renderIncomingRequests(reqRes.requests);
       }
 
-      // 2. Negotiate Offer/Answer Handshake
-      if (role === "caller") {
-        const ans = await signalGet({ action: "get_answer", roomId: currentRoomId, peerId });
-        if (ans && ans.answer && peerConnection.signalingState === "have-local-offer") {
-          await peerConnection.setRemoteDescription(new RTCSessionDescription(ans.answer));
-        }
-      } else if (role === "callee") {
-        const off = await signalGet({ action: "get_offer", roomId: currentRoomId, peerId });
-        if (off && off.offer && peerConnection.signalingState === "stable") {
-          await peerConnection.setRemoteDescription(new RTCSessionDescription(off.offer));
-          const answer = await peerConnection.createAnswer();
-          await peerConnection.setLocalDescription(answer);
-          await signalPost({
-            action: "post_answer",
-            roomId: currentRoomId,
-            peerId: peerId,
-            role: "callee",
-            payload: answer
-          });
-        }
-      }
-
-      // 3. Collect Candidate Swarm
-      const iceData = await signalGet({ action: "get_ice", roomId: currentRoomId, peerId, since: lastIceTimestamp });
-      if (iceData && iceData.candidates && iceData.candidates.length > 0) {
-        for (const item of iceData.candidates) {
-          if (item.timestamp > lastIceTimestamp) {
-            lastIceTimestamp = item.timestamp;
-            try {
-              await peerConnection.addIceCandidate(new RTCIceCandidate(item.candidate));
-            } catch (e) {
-              console.warn("Non-fatal ICE insertion error:", e);
+      // 2. Poll for signaling responses (SDP answer and ICE from approved listener)
+      if (activePeerConnection) {
+        const sigRes = await apiCall("poll_signaling", { roomId: currentRoomId, since: lastSyncTimestamp });
+        if (sigRes.status === "success") {
+          lastSyncTimestamp = sigRes.serverTime;
+          if (sigRes.answer && activePeerConnection.signalingState === "have-local-offer") {
+            await activePeerConnection.setRemoteDescription(new RTCSessionDescription(sigRes.answer.payload));
+          }
+          if (sigRes.ice && sigRes.ice.length > 0) {
+            for (const item of sigRes.ice) {
+              try { await activePeerConnection.addIceCandidate(new RTCIceCandidate(item.candidate)); } catch (e) {}
             }
           }
         }
@@ -351,127 +340,208 @@
     }, 1500);
   }
 
-  // Button Interactions
-  createBtn.onclick = async () => {
-    const micReady = await initMicrophone();
-    if (!micReady) return;
-
-    currentRoomId = "room_" + Math.random().toString(36).substring(2, 8);
-    role = "caller";
-    roomIdInput.value = currentRoomId;
-    roomIdInput.disabled = true;
-    createBtn.disabled = true;
-    joinBtn.disabled = true;
-    leaveBtn.disabled = false;
-    copyBtn.style.display = "inline-flex";
-
-    setStatus("signaling", "Registering");
-
-    await signalPost({ action: "create_room", roomId: currentRoomId, peerId, role: "caller" });
-    setupPeerConnection();
-
-    // Create and dispatch SDP Offer
-    const offer = await peerConnection.createOffer();
-    await peerConnection.setLocalDescription(offer);
-    await signalPost({ action: "post_offer", roomId: currentRoomId, peerId, role: "caller", payload: offer });
-
-    setStatus("signaling", "Awaiting Peer");
-    startPolling();
-  };
-
-  joinBtn.onclick = async () => {
-    const targetRoom = roomIdInput.value.trim();
-    if (!targetRoom) return alert("Provide a valid Room ID.");
-    
-    const micReady = await initMicrophone();
-    if (!micReady) return;
-
-    currentRoomId = targetRoom;
-    role = "callee";
-    roomIdInput.disabled = true;
-    createBtn.disabled = true;
-    joinBtn.disabled = true;
-    leaveBtn.disabled = false;
-
-    setStatus("signaling", "Joining...");
-    await signalPost({ action: "join_room", roomId: currentRoomId, peerId, role: "callee" });
-    setupPeerConnection();
-    startPolling();
-  };
-
-  copyBtn.onclick = () => {
-    const shareUrl = `${window.location.origin}${window.location.pathname}?room=${currentRoomId}`;
-    navigator.clipboard.writeText(shareUrl).then(() => {
-      copyBtn.innerText = "Copied!";
-      setTimeout(() => copyBtn.innerText = "Copy Link", 2000);
+  function renderIncomingRequests(requests) {
+    incomingRequestContainer.innerHTML = "";
+    requests.forEach(req => {
+      const banner = document.createElement("div");
+      banner.className = "approval-banner";
+      banner.innerHTML = `
+        <span><strong>${req.listener}</strong> requests to listen.</span>
+        <div class="flex-row">
+          <button class="primary" style="padding: 4px 8px; font-size: 0.75rem;" onclick="handleRequestDecision('${req.listener}', '${req.roomId}', 'approved')">Approve</button>
+          <button class="danger" style="padding: 4px 8px; font-size: 0.75rem;" onclick="handleRequestDecision('${req.listener}', '${req.roomId}', 'rejected')">Reject</button>
+        </div>
+      `;
+      incomingRequestContainer.appendChild(banner);
     });
+  }
+
+  window.handleRequestDecision = async (listener, roomId, decision) => {
+    incomingRequestContainer.innerHTML = "";
+    await apiCall("respond_request", { roomId, toUser: listener, decision });
+
+    if (decision === "approved") {
+      // Create Peer Connection and dispatch Offer
+      setupPeerConnection(listener, true);
+      const offer = await activePeerConnection.createOffer();
+      await activePeerConnection.setLocalDescription(offer);
+      await apiCall("post_offer", { roomId, toUser: listener, payload: offer });
+    }
   };
 
-  micToggleBtn.onclick = async () => {
-    await initMicrophone();
+  // ==========================================
+  // 4. LISTENER WORKFLOW & CONNECTION LOGIC
+  // ==========================================
+  async function fetchBroadcasts() {
+    const res = await apiCall("list_broadcasts");
+    if (res.status === "success") {
+      if (res.broadcasts.length === 0) {
+        broadcasterList.innerHTML = "<li><span>No active broadcasts</span></li>";
+      } else {
+        broadcasterList.innerHTML = res.broadcasts
+          .filter(b => b.broadcaster !== currentUser)
+          .map(b => `
+            <li>
+              <span>${b.broadcaster}</span>
+              <button class="primary" style="padding: 4px 10px; font-size: 0.75rem;" onclick="requestListen('${b.roomId}', '${b.broadcaster}')">Request to Listen</button>
+            </li>
+          `).join("");
+      }
+    }
+  }
+  refreshBroadcastsBtn.onclick = fetchBroadcasts;
+
+  window.requestListen = async (roomId, host) => {
+    currentRoomId = roomId;
+    targetBroadcaster = host;
+    activeRole = "listener";
+    stopSessionBtn.disabled = false;
+    startBroadcastBtn.disabled = true;
+    setStatus("signaling", "Waiting for approval");
+
+    await apiCall("request_listen", { roomId, toUser: host });
+
+    // Poll approval status
+    sessionTimer = setInterval(async () => {
+      const res = await apiCall("check_request_status", { roomId, toUser: host });
+      if (res.status === "success") {
+        if (res.decision === "rejected") {
+          clearInterval(sessionTimer);
+          alert("Your request to listen was declined by " + host);
+          resetSessionState();
+        } else if (res.decision === "approved") {
+          clearInterval(sessionTimer);
+          setStatus("connecting", "Approved. Connecting...");
+          initiateListenerSignaling(roomId, host);
+        }
+      }
+    }, 1500);
   };
 
+  function initiateListenerSignaling(roomId, host) {
+    setupPeerConnection(host, false);
+
+    sessionTimer = setInterval(async () => {
+      const sigRes = await apiCall("poll_signaling", { roomId, since: lastSyncTimestamp });
+      if (sigRes.status === "success") {
+        lastSyncTimestamp = sigRes.serverTime;
+        // Check for Offer
+        if (sigRes.offer && activePeerConnection.signalingState === "stable") {
+          await activePeerConnection.setRemoteDescription(new RTCSessionDescription(sigRes.offer.payload));
+          const answer = await activePeerConnection.createAnswer();
+          await activePeerConnection.setLocalDescription(answer);
+          await apiCall("post_answer", { roomId, toUser: host, payload: answer });
+        }
+        // Handle ICE
+        if (sigRes.ice && sigRes.ice.length > 0) {
+          for (const item of sigRes.ice) {
+            try { await activePeerConnection.addIceCandidate(new RTCIceCandidate(item.candidate)); } catch (e) {}
+          }
+        }
+      }
+    }, 1500);
+  }
+
+  // ==========================================
+  // 5. PEERCONNECTION & AUTOPLAY MITIGATION
+  // ==========================================
+  function setupPeerConnection(targetPeer, isBroadcaster) {
+    if (activePeerConnection) activePeerConnection.close();
+    activePeerConnection = new RTCPeerConnection(RTC_CONFIG);
+
+    if (isBroadcaster && localAudioStream) {
+      // Broadcaster attaches outgoing track
+      localAudioStream.getTracks().forEach(track => activePeerConnection.addTrack(track, localAudioStream));
+    } else {
+      // Listener explicitly requests incoming audio transceiver
+      activePeerConnection.addTransceiver('audio', { direction: 'recvonly' });
+    }
+
+    activePeerConnection.ontrack = (event) => {
+      if (event.streams && event.streams[0]) {
+        remoteAudio.srcObject = event.streams[0];
+        
+        // Attempt Autoplay
+        const playPromise = remoteAudio.play();
+        if (playPromise !== undefined) {
+          playPromise.then(() => {
+            audioUnlockBtn.classList.add("hidden");
+          }).catch(err => {
+            console.warn("Autoplay prevented by browser policy:", err);
+            // Show explicit unlock button for user activation
+            audioUnlockBtn.classList.remove("hidden");
+            audioUnlockBtn.onclick = () => {
+              remoteAudio.play();
+              audioUnlockBtn.classList.add("hidden");
+            };
+          });
+        }
+      }
+    };
+
+    activePeerConnection.onicecandidate = (event) => {
+      if (event.candidate) {
+        apiCall("post_ice", {
+          roomId: currentRoomId,
+          toUser: targetPeer,
+          payload: event.candidate
+        });
+      }
+    };
+
+    activePeerConnection.oniceconnectionstatechange = () => {
+      const st = activePeerConnection.iceConnectionState;
+      if (st === "checking") setStatus("connecting", "Negotiating...");
+      if (st === "connected" || st === "completed") setStatus("live", "Live Stream");
+      if (st === "disconnected" || st === "failed" || st === "closed") setStatus("", "Disconnected");
+    };
+  }
+
+  // Mute / Unmute
   muteBtn.onclick = () => {
-    if (!localStream) return;
+    if (!localAudioStream) return;
     isMuted = !isMuted;
-    localStream.getAudioTracks().forEach(track => track.enabled = !isMuted);
+    localAudioStream.getAudioTracks().forEach(t => t.enabled = !isMuted);
     muteBtn.innerText = isMuted ? "Unmute" : "Mute";
     muteBtn.className = isMuted ? "danger" : "";
   };
 
-  leaveBtn.onclick = cleanupSession;
+  // Session Teardown
+  stopSessionBtn.onclick = resetSessionState;
 
-  async function cleanupSession() {
-    if (pollInterval) clearInterval(pollInterval);
+  async function resetSessionState() {
+    if (sessionTimer) clearInterval(sessionTimer);
     if (animFrameId) cancelAnimationFrame(animFrameId);
-    
-    if (currentRoomId) {
-      await signalPost({ action: "leave_room", roomId: currentRoomId, peerId });
+
+    if (activeRole === "broadcaster") {
+      await apiCall("stop_broadcast", { roomId: currentRoomId });
+    } else {
+      await apiCall("leave", { roomId: currentRoomId });
     }
 
-    if (peerConnection) {
-      peerConnection.close();
-      peerConnection = null;
+    if (activePeerConnection) {
+      activePeerConnection.close();
+      activePeerConnection = null;
     }
 
-    if (localStream) {
-      localStream.getTracks().forEach(t => t.stop());
-      localStream = null;
+    if (localAudioStream) {
+      localAudioStream.getTracks().forEach(t => t.stop());
+      localAudioStream = null;
     }
 
-    if (audioContext) {
-      audioContext.close();
-      audioContext = null;
-    }
-
-    // Reset visualizer bars
     bars.forEach(b => b.style.height = "2px");
-
-    // UI Reset
-    setStatus("", "Disconnected");
-    roomIdInput.disabled = false;
-    roomIdInput.value = "";
-    createBtn.disabled = false;
-    joinBtn.disabled = false;
-    leaveBtn.disabled = true;
-    copyBtn.style.display = "none";
-    micToggleBtn.disabled = false;
-    micToggleBtn.innerText = "Turn On Mic";
+    audioUnlockBtn.classList.add("hidden");
+    incomingRequestContainer.innerHTML = "";
+    startBroadcastBtn.disabled = false;
     muteBtn.disabled = true;
-    peerList.innerHTML = "<li><span>No peers detected</span></li>";
+    stopSessionBtn.disabled = true;
     currentRoomId = null;
-    role = null;
+    targetBroadcaster = null;
+    activeRole = null;
+    lastSyncTimestamp = 0;
+    setStatus("", currentUser);
+    fetchBroadcasts();
   }
-
-  // Graceful browser shutdown handling
-  window.addEventListener("beforeunload", () => {
-    if (currentRoomId) {
-      navigator.sendBeacon(
-        GAS_SIGNALING_URL, 
-        JSON.stringify({ action: "leave_room", roomId: currentRoomId, peerId })
-      );
-    }
-  });
 </script>
 </body>
 </html>
