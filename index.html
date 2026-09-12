@@ -2,16 +2,15 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
-  <meta name="apple-mobile-web-app-capable" content="yes" />
-  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-  <meta name="theme-color" content="#0d1117" />
-  <title>P2P Instant Stereo Radio v9 - Loudspeaker Edition</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>P2P Voice Switchboard - Desktop Edition</title>
   <style>
     :root {
-      --bg: #0d1117;
-      --panel: #161b22;
-      --border: #30363d;
+      --bg: #0b0e14;
+      --panel: #151921;
+      --panel-hover: #1c222d;
+      --border: #262c36;
+      --border-focus: #58a6ff;
       --accent: #238636;
       --accent-hover: #2ea043;
       --danger: #da3633;
@@ -27,76 +26,83 @@
       box-sizing: border-box;
       margin: 0;
       padding: 0;
-      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, sans-serif;
-      -webkit-tap-highlight-color: transparent;
-      touch-action: manipulation;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
     }
 
     body {
       background: var(--bg);
       color: var(--text);
-      min-height: 100dvh;
+      min-height: 100vh;
       display: flex;
       flex-direction: column;
       align-items: center;
-      justify-content: flex-start;
-      padding: calc(env(safe-area-inset-top) + 12px) 16px calc(env(safe-area-inset-bottom) + 16px);
-      overflow-x: hidden;
+      padding: 24px;
     }
 
-    .container {
+    .app-wrapper {
       width: 100%;
-      max-width: 540px;
+      max-width: 1100px;
       display: flex;
       flex-direction: column;
-      gap: 12px;
+      gap: 20px;
     }
 
+    /* Desktop Navigation / Header */
     header {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 16px 24px;
       display: flex;
       justify-content: space-between;
       align-items: center;
-      padding: 8px 0 4px;
+      box-shadow: 0 4px 16px rgba(0,0,0,0.3);
+    }
+
+    .brand-group {
+      display: flex;
+      align-items: center;
+      gap: 12px;
     }
 
     h1 {
-      font-size: 1.2rem;
+      font-size: 1.25rem;
       font-weight: 700;
       color: var(--text-bright);
       letter-spacing: -0.02em;
     }
 
-    .status-group {
+    .system-status {
       display: flex;
       align-items: center;
-      gap: 6px;
+      gap: 8px;
     }
 
     .status-badge {
       display: flex;
       align-items: center;
       gap: 6px;
-      font-size: 0.72rem;
+      font-size: 0.75rem;
       text-transform: uppercase;
       font-weight: 700;
-      padding: 6px 10px;
+      padding: 6px 12px;
       border-radius: 999px;
-      background: #21262d;
+      background: #0d1117;
       border: 1px solid var(--border);
     }
 
     .channel-badge {
-      font-size: 0.7rem;
+      font-size: 0.72rem;
       font-weight: 700;
-      padding: 5px 8px;
+      padding: 6px 10px;
       border-radius: 6px;
-      background: #21262d;
+      background: #0d1117;
       border: 1px solid var(--border);
       color: var(--muted);
     }
 
     .channel-badge.stereo {
-      background: #2e1a47;
+      background: #231938;
       border-color: var(--stereo);
       color: var(--stereo);
     }
@@ -127,67 +133,100 @@
       to { opacity: 1; }
     }
 
+    /* Dual-Pane Desktop Layout */
+    .dashboard-grid {
+      display: grid;
+      grid-template-columns: 1.2fr 0.8fr;
+      gap: 20px;
+      align-items: start;
+    }
+
+    @media (max-width: 860px) {
+      .dashboard-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
     .card {
       background: var(--panel);
       border: 1px solid var(--border);
       border-radius: 12px;
-      padding: 16px;
-      box-shadow: 0 4px 16px rgba(0,0,0,0.4);
+      padding: 24px;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.4);
     }
 
-    .group-label {
-      font-size: 0.75rem;
-      color: var(--muted);
-      text-transform: uppercase;
-      margin-bottom: 10px;
-      font-weight: 600;
+    .card-header {
       display: flex;
       justify-content: space-between;
       align-items: center;
+      margin-bottom: 16px;
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 12px;
     }
 
-    .flex-row {
+    .card-title {
+      font-size: 0.85rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      font-weight: 700;
+      color: var(--muted);
+    }
+
+    /* Visualizer (Expanded for Desktop) */
+    .visualizer-container {
+      height: 64px;
+      width: 100%;
       display: flex;
-      gap: 8px;
-      align-items: center;
+      align-items: flex-end;
+      gap: 4px;
+      margin-bottom: 20px;
+      background: #090c10;
+      padding: 8px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
     }
 
-    button, select {
-      min-height: 48px;
-      min-width: 48px;
+    .visualizer-bar {
+      flex: 1;
+      background: #238636;
+      min-height: 3px;
+      height: 3px;
+      border-radius: 2px;
+      transition: height 0.04s ease;
+    }
+
+    /* Action Buttons & Desktop Controls */
+    .control-row {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    button {
       background: #21262d;
       border: 1px solid var(--border);
       color: var(--text-bright);
-      padding: 0 16px;
+      padding: 10px 18px;
       border-radius: 8px;
-      font-size: 0.9rem;
+      font-size: 0.88rem;
       font-weight: 600;
       cursor: pointer;
       display: inline-flex;
       align-items: center;
       justify-content: center;
-      gap: 6px;
-      transition: background 0.15s ease, transform 0.05s ease;
-      user-select: none;
-    }
-
-    select {
-      flex: 1;
-      width: 100%;
+      gap: 8px;
+      transition: background 0.15s ease, border-color 0.15s ease;
       outline: none;
-      -webkit-appearance: none;
-      background-image: url('data:image/svg+xml;utf8,<svg fill="%23c9d1d9" height="24" viewBox="0 0 24 24" width="24" xmlns="http://www.w3.org/2000/svg"><path d="M7 10l5 5 5-5z"/></svg>');
-      background-repeat: no-repeat;
-      background-position: right 12px center;
-      padding-right: 36px;
     }
 
-    button:active:not(:disabled) {
-      transform: scale(0.98);
+    button:focus-visible {
+      border-color: var(--border-focus);
+      box-shadow: 0 0 0 3px rgba(88, 166, 255, 0.3);
     }
 
     button:hover:not(:disabled) {
-      background: #30363d;
+      background: var(--panel-hover);
+      border-color: var(--muted);
     }
 
     button.primary {
@@ -215,64 +254,57 @@
     }
 
     button:disabled {
-      opacity: 0.45;
+      opacity: 0.4;
       cursor: not-allowed;
     }
 
-    .visualizer-container {
-      height: 40px;
-      width: 100%;
-      display: flex;
-      align-items: flex-end;
-      gap: 3px;
-      margin: 10px 0 14px;
-      background: #010409;
-      padding: 4px 6px;
-      border-radius: 8px;
-    }
-
-    .visualizer-bar {
-      flex: 1;
-      background: #238636;
-      min-height: 2px;
-      height: 2px;
-      border-radius: 2px;
-    }
-
+    /* Station List Table / View */
     .item-list {
       list-style: none;
-      font-size: 0.9rem;
-      color: var(--muted);
-      max-height: 240px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      max-height: 480px;
       overflow-y: auto;
-      -webkit-overflow-scrolling: touch;
     }
 
     .item-list li {
+      background: #0d1117;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 12px 16px;
       display: flex;
       justify-content: space-between;
       align-items: center;
-      min-height: 52px;
-      padding: 8px 0;
-      border-bottom: 1px dotted var(--border);
+      transition: border-color 0.15s ease;
     }
 
-    .item-list li:last-child {
-      border-bottom: none;
+    .item-list li:hover {
+      border-color: var(--muted);
     }
 
-    .hidden {
-      display: none !important;
+    .station-info {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .station-name {
+      font-weight: 600;
+      color: var(--text-bright);
+      font-size: 0.95rem;
     }
 
     .badge {
       background: #21262d;
       border: 1px solid var(--border);
-      padding: 4px 8px;
-      border-radius: 6px;
-      font-size: 0.75rem;
+      padding: 3px 6px;
+      border-radius: 4px;
+      font-size: 0.72rem;
       font-weight: 700;
       color: var(--muted);
+      display: inline-block;
+      width: fit-content;
     }
 
     .badge.live {
@@ -285,30 +317,28 @@
       border-color: var(--warn);
     }
 
-    .speaker-section {
-      margin-top: 10px;
-      background: #0d1117;
-      border: 1px solid var(--border);
-      border-radius: 8px;
-      padding: 10px;
+    .hidden {
+      display: none !important;
     }
 
-    .speaker-section label {
-      display: block;
-      font-size: 0.7rem;
+    .empty-message {
       color: var(--muted);
-      text-transform: uppercase;
-      font-weight: 700;
-      margin-bottom: 6px;
+      font-size: 0.88rem;
+      padding: 24px 0;
+      text-align: center;
     }
   </style>
 </head>
 <body>
 
-<div class="container">
+<div class="app-wrapper">
+  <!-- Desktop Header -->
   <header>
-    <h1>P2P Radio</h1>
-    <div class="status-group">
+    <div class="brand-group">
+      <h1>P2P Voice Switchboard</h1>
+      <span class="badge" id="myIdentityBadge">ID: Initializing...</span>
+    </div>
+    <div class="system-status">
       <span class="channel-badge" id="channelBadge">MONO (1-CH)</span>
       <div class="status-badge">
         <span class="dot" id="statusDot"></span>
@@ -317,73 +347,75 @@
     </div>
   </header>
 
-  <!-- Broadcaster Deck -->
-  <div class="card" id="broadcasterCard">
-    <div class="group-label">
-      <span>Broadcast Transmitter (<strong id="myStationLabel">Not Live</strong>)</span>
-      <span id="listenerCountText" class="hidden">Listeners: <strong id="listenerCount">0</strong></span>
-    </div>
-    
-    <div class="visualizer-container" id="visualizer"></div>
+  <div class="dashboard-grid">
+    <!-- LEFT PANEL: Active Station Console / Transmitter -->
+    <section class="left-panel">
+      <!-- Broadcaster Deck -->
+      <div class="card" id="broadcasterCard">
+        <div class="card-header">
+          <span class="card-title">Transmitter Station (<strong id="myStationLabel">Off-Air</strong>)</span>
+          <span id="listenerCountText" class="hidden">Listeners: <strong id="listenerCount">0</strong></span>
+        </div>
 
-    <div id="broadcastPreStart" class="flex-row">
-      <button class="primary" id="startBroadcastBtn" style="width: 100%;">Go Live (Instant Broadcast)</button>
-    </div>
+        <div class="visualizer-container" id="visualizer"></div>
 
-    <div id="broadcastControls" class="flex-row hidden" style="flex-wrap: wrap; margin-top: 8px;">
-      <button id="pauseBroadcastBtn" style="flex: 1 1 calc(50% - 4px);">Pause</button>
-      <button id="muteBtn" style="flex: 1 1 calc(50% - 4px);">Mute Mic</button>
-      <button id="recordBroadcasterBtn" style="flex: 1 1 calc(50% - 4px);">Record</button>
-      <button id="stopSessionBtn" class="danger" style="flex: 1 1 calc(50% - 4px);">Stop Station</button>
-    </div>
-  </div>
+        <div id="broadcastPreStart">
+          <button class="primary" id="startBroadcastBtn" style="width: 100%; height: 48px;">
+            Go Live (Instant Broadcast)
+          </button>
+        </div>
 
-  <!-- Listener Deck -->
-  <div class="card hidden" id="listenerCard">
-    <div class="group-label">
-      <span>Tuned In: <strong id="currentStationTitle">Station</strong></span>
-      <span class="badge live" id="stationStateBadge">LIVE</span>
-    </div>
+        <div id="broadcastControls" class="control-row hidden">
+          <button id="pauseBroadcastBtn" style="flex: 1;">Pause Broadcast</button>
+          <button id="muteBtn" style="flex: 1;">Mute Microphone</button>
+          <button id="recordBroadcasterBtn" style="flex: 1;">Record Audio</button>
+          <button id="stopSessionBtn" class="danger" style="flex: 1;">Stop Station</button>
+        </div>
+      </div>
 
-    <!-- Speaker Output Routing Section -->
-    <div class="speaker-section" id="speakerRoutingWrapper">
-      <label for="audioOutputSelect">🔊 Speaker Output Route</label>
-      <select id="audioOutputSelect">
-        <option value="default">Default Loudspeaker</option>
-      </select>
-    </div>
+      <!-- Listener Deck -->
+      <div class="card hidden" id="listenerCard" style="margin-top: 20px;">
+        <div class="card-header">
+          <span class="card-title">Tuned In: <strong id="currentStationTitle">Station</strong></span>
+          <span class="badge live" id="stationStateBadge">LIVE</span>
+        </div>
 
-    <div class="flex-row" style="margin-top: 10px; flex-wrap: wrap;">
-      <button class="primary" id="listenerPlayPauseBtn" style="flex: 1 1 calc(50% - 4px);">Pause</button>
-      <button id="listenerMuteBtn" style="flex: 1 1 calc(50% - 4px);">Mute</button>
-      <button id="recordListenerBtn" style="flex: 1 1 calc(50% - 4px);">Record</button>
-      <button class="danger" id="tuneOutBtn" style="flex: 1 1 calc(50% - 4px);">Tune Out</button>
-    </div>
-  </div>
+        <div class="control-row">
+          <button class="primary" id="listenerPlayPauseBtn" style="flex: 1;">Pause</button>
+          <button id="listenerMuteBtn" style="flex: 1;">Mute</button>
+          <button id="recordListenerBtn" style="flex: 1;">Record Stream</button>
+          <button class="danger" id="tuneOutBtn" style="flex: 1;">Tune Out</button>
+        </div>
+      </div>
+    </section>
 
-  <!-- Live Stations Directory -->
-  <div class="card">
-    <div class="group-label">
-      <span>Live Stations</span>
-      <button id="refreshStationsBtn" style="min-height: 32px; min-width: 32px; font-size: 0.75rem; padding: 0 10px;">Refresh</button>
-    </div>
-    <ul class="item-list" id="stationList">
-      <li><span>Scanning radio frequencies...</span></li>
-    </ul>
+    <!-- RIGHT PANEL: Live Directory -->
+    <section class="right-panel">
+      <div class="card">
+        <div class="card-header">
+          <span class="card-title">Live Stations Directory</span>
+          <button id="refreshStationsBtn" style="padding: 6px 12px; font-size: 0.78rem;">Refresh List</button>
+        </div>
+        <ul class="item-list" id="stationList">
+          <li class="empty-message">Scanning radio frequencies...</li>
+        </ul>
+      </div>
+    </section>
   </div>
 </div>
 
-<!-- Primary Stream Element configured for Loudspeaker projection -->
+<!-- Primary Audio Playback Pipeline -->
 <audio id="remoteAudio" autoplay playsinline></audio>
 
-<!-- Background Keep-Alive Audio Element for iOS Safari -->
+<!-- Background Silent Loop Pipeline -->
 <audio id="silentKeepAlive" loop playsinline src="data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQAAAAA="></audio>
 
 <script>
   /**
    * CONFIGURATION
+   * Paste your published Google Apps Script Web App URL below:
    */
-  const GAS_SIGNALING_URL = "https://script.google.com/macros/s/AKfycbzXZKXYms6i2L9G30PATMmf4A0cG4V57EiMHb2NvbJRfqioPCHxXKyvJIX8PXj5t-Ll/exec";
+  const GAS_SIGNALING_URL = "https://script.google.com/macros/s/AKfycbwyswXBG9YtwgJ4b7TGD9VKJTThJwCg7Yefws6Sz5SFmGWD4Q9d2t8txxfEstY_TQTV/exec";
 
   const RTC_CONFIG = {
     iceServers: [
@@ -392,11 +424,11 @@
     ]
   };
 
-  // Persistent User Identity
-  let currentUser = localStorage.getItem("p2p_radio_user");
+  // Persistent Client Identity
+  let currentUser = localStorage.getItem("p2p_desktop_user");
   if (!currentUser) {
-    currentUser = "user_" + Math.random().toString(36).substring(2, 8);
-    localStorage.setItem("p2p_radio_user", currentUser);
+    currentUser = "desk_" + Math.random().toString(36).substring(2, 8);
+    localStorage.setItem("p2p_desktop_user", currentUser);
   }
 
   // Session State
@@ -406,27 +438,23 @@
   let isStereoHardware = false;
   let hasNotifiedTuneIn = false;
 
-  // Multi-Listener Pool & Listener Connection
+  // WebRTC Pools
   const broadcasterPeerConnections = {};
   let listenerPeerConnection = null;
 
-  // ICE Buffers for Batch Transmission
+  // Batched ICE Buffer
   const iceCandidateBuffer = {};
   let iceBatchTimer = null;
 
-  // Audio Engine Lifecycle
-  let localAudioStream = null;
+  // Unified Single AudioContext Instance
   let sharedAudioContext = null;
+  let localAudioStream = null;
   let analyserNode = null;
   let visualizerSourceNode = null;
   let animFrameId = null;
   let lastSyncTimestamp = 0;
 
-  // Speaker Gain Pipeline
-  let speakerGainNode = null;
-  let remoteAudioSourceNode = null;
-
-  // Dual-Layer Keep-Alive Oscillator & WakeLock
+  // Keep-Alive & WakeLock
   let keepAliveOscillator = null;
   let wakeLockSentinel = null;
 
@@ -442,21 +470,22 @@
   let listenerRecorder = null;
   let listenerRecordedChunks = [];
 
-  // Adaptive Worker Interval State
+  // Adaptive Worker Interval
   let targetPollInterval = 1200;
 
-  // DOM Elements
+  // DOM Handles
   const statusDot = document.getElementById("statusDot");
   const statusText = document.getElementById("statusText");
   const channelBadge = document.getElementById("channelBadge");
+  const myIdentityBadge = document.getElementById("myIdentityBadge");
+  const myStationLabel = document.getElementById("myStationLabel");
   const stationList = document.getElementById("stationList");
   const refreshStationsBtn = document.getElementById("refreshStationsBtn");
   const remoteAudio = document.getElementById("remoteAudio");
   const silentKeepAlive = document.getElementById("silentKeepAlive");
   const visualizerContainer = document.getElementById("visualizer");
-  const myStationLabel = document.getElementById("myStationLabel");
 
-  // Broadcaster DOM
+  // Broadcaster Handles
   const broadcasterCard = document.getElementById("broadcasterCard");
   const broadcastPreStart = document.getElementById("broadcastPreStart");
   const broadcastControls = document.getElementById("broadcastControls");
@@ -468,7 +497,7 @@
   const listenerCountText = document.getElementById("listenerCountText");
   const listenerCountDisplay = document.getElementById("listenerCount");
 
-  // Listener DOM
+  // Listener Handles
   const listenerCard = document.getElementById("listenerCard");
   const currentStationTitle = document.getElementById("currentStationTitle");
   const stationStateBadge = document.getElementById("stationStateBadge");
@@ -476,10 +505,9 @@
   const listenerMuteBtn = document.getElementById("listenerMuteBtn");
   const recordListenerBtn = document.getElementById("recordListenerBtn");
   const tuneOutBtn = document.getElementById("tuneOutBtn");
-  const audioOutputSelect = document.getElementById("audioOutputSelect");
 
-  // Build Visualizer UI
-  const NUM_BARS = 24;
+  // Setup Visualizer Bars (Desktop Expanded: 36 Bars)
+  const NUM_BARS = 36;
   const bars = [];
   for (let i = 0; i < NUM_BARS; i++) {
     const b = document.createElement("div");
@@ -487,6 +515,9 @@
     visualizerContainer.appendChild(b);
     bars.push(b);
   }
+
+  // Initialize UI Identifiers
+  myIdentityBadge.innerText = `ID: ${currentUser}`;
 
   function setStatus(state, text) {
     statusDot.className = "dot " + state;
@@ -502,6 +533,9 @@
     }
   }
 
+  // ==========================================
+  // UNIFIED AUDIO CONTEXT LIFECYCLE
+  // ==========================================
   function getOrCreateAudioContext() {
     if (!sharedAudioContext) {
       const AudioCtx = window.AudioContext || window.webkitAudioContext;
@@ -514,59 +548,14 @@
   }
 
   // ==========================================
-  // LOUDSPEAKER ROUTING & SELECTION ENGINE
-  // ==========================================
-  async function populateAudioOutputs() {
-    if (!navigator.mediaDevices || !navigator.mediaDevices.enumerateDevices) return;
-    try {
-      const devices = await navigator.mediaDevices.enumerateDevices();
-      const outputDevices = devices.filter(d => d.kind === 'audiooutput');
-
-      audioOutputSelect.innerHTML = '';
-
-      if (outputDevices.length === 0) {
-        const opt = document.createElement('option');
-        opt.value = 'default';
-        opt.innerText = 'Built-in Loudspeaker / Default Device';
-        audioOutputSelect.appendChild(opt);
-        return;
-      }
-
-      outputDevices.forEach(device => {
-        const option = document.createElement('option');
-        option.value = device.deviceId;
-        let label = device.label || `Speaker ${audioOutputSelect.length + 1}`;
-        if (label.toLowerCase().includes('speaker') || label.toLowerCase().includes('loudspeaker')) {
-          label = '🔊 ' + label;
-        }
-        option.innerText = label;
-        audioOutputSelect.appendChild(option);
-      });
-    } catch (e) {
-      console.warn("Could not enumerate audio output devices:", e);
-    }
-  }
-
-  audioOutputSelect.onchange = async () => {
-    const deviceId = audioOutputSelect.value;
-    if (typeof remoteAudio.setSinkId === 'function') {
-      try {
-        await remoteAudio.setSinkId(deviceId);
-      } catch (err) {
-        console.warn("setSinkId failed, default speaker active:", err);
-      }
-    }
-  };
-
-  // ==========================================
-  // 1. DUAL-LAYER KEEP-ALIVE & WAKELOCK
+  // KEEP-ALIVE & WAKELOCK
   // ==========================================
   async function requestScreenWakeLock() {
     if ('wakeLock' in navigator) {
       try {
         wakeLockSentinel = await navigator.wakeLock.request('screen');
       } catch (err) {
-        console.warn("WakeLock request skipped:", err);
+        console.warn("WakeLock request bypassed:", err);
       }
     }
   }
@@ -587,7 +576,7 @@
       if (!keepAliveOscillator) {
         keepAliveOscillator = ctx.createOscillator();
         const silentGain = ctx.createGain();
-        silentGain.gain.value = 0.0001;
+        silentGain.gain.value = 0.0001; // Inaudible
         keepAliveOscillator.connect(silentGain);
         silentGain.connect(ctx.destination);
         keepAliveOscillator.start();
@@ -602,7 +591,7 @@
       navigator.mediaSession.metadata = new MediaMetadata({
         title: stationTitle ? stationTitle.replace('station_', '') : 'Live Transmission',
         artist: 'P2P Voice Radio',
-        album: 'Live Broadcast'
+        album: 'Live Transmission'
       });
       navigator.mediaSession.playbackState = 'playing';
       navigator.mediaSession.setActionHandler('play', () => {
@@ -623,7 +612,7 @@
   }
 
   // ==========================================
-  // 2. PULL-BASED WORKER SCHEDULER
+  // PULL-BASED WORKER SCHEDULER (Freezing Fix)
   // ==========================================
   const workerBlobCode = `
     let timer = null;
@@ -645,6 +634,7 @@
   signalingWorker.onmessage = async (e) => {
     if (e.data.type === 'tick') {
       await executePollCycle();
+      // Schedule next tick strictly after previous cycle completes
       if (currentStationId) {
         signalingWorker.postMessage({ action: 'schedule_next', interval: targetPollInterval });
       }
@@ -723,7 +713,7 @@
     }
   }
 
-  // Safe Safari SDP Stereo Modifier
+  // Safe Opus Stereo SDP Modifier
   function safelyInjectStereoSDP(sdp) {
     try {
       const match = sdp.match(/a=rtpmap:(\d+)\s+opus\/48000\/2/i);
@@ -745,10 +735,13 @@
     }
   }
 
-  // Visualizer Pipeline with Zero-Destination Routing
+  // =========================================================
+  // ZERO-DESTINATION VISUALIZER (Eliminates CPU Loop / Hang)
+  // =========================================================
   function initVisualizer(stream) {
     const ctx = getOrCreateAudioContext();
 
+    // Disconnect previous node to prevent audio graph leaks
     if (visualizerSourceNode) {
       try { visualizerSourceNode.disconnect(); } catch (e) {}
       visualizerSourceNode = null;
@@ -761,6 +754,7 @@
 
     try {
       visualizerSourceNode = ctx.createMediaStreamSource(stream);
+      // Route exclusively to analyser. DO NOT connect to ctx.destination!
       visualizerSourceNode.connect(analyserNode);
     } catch (e) {
       console.warn("Visualizer node setup bypassed:", e);
@@ -775,6 +769,7 @@
           return;
         }
 
+        // Throttle frame execution if tab is hidden
         if (document.hidden) {
           animFrameId = requestAnimationFrame(render);
           return;
@@ -821,7 +816,7 @@
   }
 
   // ==========================================
-  // 3. BROADCASTER ACTIONS
+  // BROADCASTER ACTIONS
   // ==========================================
   startBroadcastBtn.onclick = async () => {
     startBroadcastBtn.disabled = true;
@@ -857,7 +852,7 @@
     isBroadcastPaused = !isBroadcastPaused;
     localAudioStream.getAudioTracks().forEach(t => t.enabled = !isBroadcastPaused);
 
-    pauseBroadcastBtn.innerText = isBroadcastPaused ? "Resume" : "Pause";
+    pauseBroadcastBtn.innerText = isBroadcastPaused ? "Resume Broadcast" : "Pause Broadcast";
     pauseBroadcastBtn.className = isBroadcastPaused ? "danger" : "";
     setStatus(isBroadcastPaused ? "paused" : "live", isBroadcastPaused ? "Paused" : "On-Air");
 
@@ -871,7 +866,7 @@
     if (!localAudioStream) return;
     isMicMuted = !isMicMuted;
     localAudioStream.getAudioTracks().forEach(t => t.enabled = !isMicMuted);
-    muteBtn.innerText = isMicMuted ? "Unmute Mic" : "Mute Mic";
+    muteBtn.innerText = isMicMuted ? "Unmute Mic" : "Mute Microphone";
     muteBtn.className = isMicMuted ? "danger" : "";
   };
 
@@ -879,7 +874,7 @@
     if (!localAudioStream) return;
     if (broadcasterRecorder && broadcasterRecorder.state === "recording") {
       broadcasterRecorder.stop();
-      recordBroadcasterBtn.innerText = "Record";
+      recordBroadcasterBtn.innerText = "Record Audio";
       recordBroadcasterBtn.classList.remove("recording");
     } else {
       broadcasterRecordedChunks = [];
@@ -901,7 +896,7 @@
       };
 
       broadcasterRecorder.start();
-      recordBroadcasterBtn.innerText = "Stop";
+      recordBroadcasterBtn.innerText = "Stop Recording";
       recordBroadcasterBtn.classList.add("recording");
     }
   };
@@ -960,7 +955,7 @@
   }
 
   // ==========================================
-  // 4. LISTENER ACTIONS & LOUDSPEAKER INITIALIZATION
+  // LISTENER ACTIONS & INSTANT TUNE-IN
   // ==========================================
   async function fetchStations() {
     refreshStationsBtn.disabled = true;
@@ -969,7 +964,7 @@
 
     if (res && res.status === "success") {
       if (!res.stations || res.stations.length === 0) {
-        stationList.innerHTML = "<li><span>No stations live currently</span></li>";
+        stationList.innerHTML = `<li class="empty-message">No active stations detected on-air.</li>`;
       } else {
         stationList.innerHTML = res.stations
           .map(s => {
@@ -979,40 +974,30 @@
             const statusClass = s.status === "live" ? "badge live" : "badge paused";
             return `
               <li>
-                <div>
-                  <strong>${s.stationId.replace("station_", "")}</strong>
-                  <span class="${channelClass}" style="margin-left: 6px;">${channelText}</span>
-                  <span class="${statusClass}">${s.status === "live" ? "LIVE" : "PAUSED"}</span>
+                <div class="station-info">
+                  <span class="station-name">${s.stationId.replace("station_", "")}</span>
+                  <div style="display: flex; gap: 6px; align-items: center;">
+                    <span class="${channelClass}">${channelText}</span>
+                    <span class="${statusClass}">${s.status === "live" ? "LIVE" : "PAUSED"}</span>
+                  </div>
                 </div>
                 <div>
-                  ${isMe ? '<span class="badge">Your Station</span>' : `<button class="primary" style="min-height: 40px; padding: 0 14px; font-size: 0.8rem;" onclick="tuneIntoStation('${s.stationId}', '${s.broadcaster}', ${s.stereo})">Tune In</button>`}
+                  ${isMe ? '<span class="badge">Your Station</span>' : `<button class="primary" style="padding: 6px 14px; font-size: 0.82rem;" onclick="tuneIntoStation('${s.stationId}', '${s.broadcaster}', ${s.stereo})">Tune In</button>`}
                 </div>
               </li>
             `;
           }).join("");
       }
     } else {
-      stationList.innerHTML = "<li><span style='color: var(--warn);'>Failed to load stations.</span></li>";
+      stationList.innerHTML = `<li class="empty-message" style="color: var(--warn);">Directory synchronization error.</li>`;
     }
   }
   refreshStationsBtn.onclick = fetchStations;
 
   window.tuneIntoStation = async (stationId, broadcaster, isStereo) => {
-    // 1. Prime Web Audio and native Audio context for media playback
+    // Unlock Audio Context on direct user interaction
     getOrCreateAudioContext();
     remoteAudio.play().catch(() => {});
-
-    // 2. Discover and configure output device list
-    await populateAudioOutputs();
-
-    // 3. Default explicitly to Loudspeaker output if supported by browser
-    if (typeof remoteAudio.setSinkId === 'function') {
-      try {
-        await remoteAudio.setSinkId('');
-      } catch (err) {
-        console.warn("Loudspeaker default sink assignment bypassed:", err);
-      }
-    }
 
     activateKeepAlive(stationId);
 
@@ -1048,15 +1033,9 @@
 
     listenerPeerConnection.ontrack = (event) => {
       if (event.streams && event.streams[0]) {
-        const stream = event.streams[0];
-        remoteAudio.srcObject = stream;
-        
-        // Force volume to maximum for loudspeaker projection
-        remoteAudio.volume = 1.0;
+        remoteAudio.srcObject = event.streams[0];
         remoteAudio.play().catch(() => {});
-
-        // Wire into zero-destination frequency visualizer
-        initVisualizer(stream);
+        initVisualizer(event.streams[0]);
       }
     };
 
@@ -1068,10 +1047,10 @@
 
     listenerPeerConnection.oniceconnectionstatechange = () => {
       const st = listenerPeerConnection.iceConnectionState;
-      if (st === "checking") setStatus("connecting", "Connecting...");
+      if (st === "checking") setStatus("connecting", "Negotiating...");
       if (st === "connected" || st === "completed") {
-        setStatus("live", "Tuned In (Loudspeaker)");
-        targetPollInterval = 4000;
+        setStatus("live", "Tuned In");
+        targetPollInterval = 4000; // Slow down once connected
       }
       if (["disconnected", "failed", "closed"].includes(st)) {
         setStatus("", "Disconnected");
@@ -1101,7 +1080,7 @@
     if (!remoteAudio.srcObject) return alert("No active stream to record.");
     if (listenerRecorder && listenerRecorder.state === "recording") {
       listenerRecorder.stop();
-      recordListenerBtn.innerText = "Record";
+      recordListenerBtn.innerText = "Record Stream";
       recordListenerBtn.classList.remove("recording");
     } else {
       listenerRecordedChunks = [];
@@ -1123,13 +1102,13 @@
       };
 
       listenerRecorder.start();
-      recordListenerBtn.innerText = "Stop";
+      recordListenerBtn.innerText = "Stop Recording";
       recordListenerBtn.classList.add("recording");
     }
   };
 
   // ==========================================
-  // 5. SEQUENTIAL PULL-BASED SIGNALING CYCLE
+  // SEQUENTIAL PULL-BASED SIGNALING CYCLE
   // ==========================================
   let isPollingInProgress = false;
 
@@ -1142,6 +1121,7 @@
       if (res && res.status === "success") {
         lastSyncTimestamp = res.serverTime;
 
+        // Broadcaster Inbound Pipeline
         if (activeRole === "broadcaster") {
           if (res.newListeners && res.newListeners.length > 0) {
             for (const item of res.newListeners) {
@@ -1169,6 +1149,7 @@
           }
         }
 
+        // Listener Inbound Pipeline
         if (activeRole === "listener") {
           if (res.stationState === "station_paused") {
             stationStateBadge.innerText = "PAUSED";
@@ -1214,7 +1195,7 @@
         }
       }
     } catch (err) {
-      console.warn("Signaling poll encountered exception:", err);
+      console.warn("Signaling cycle exception:", err);
     } finally {
       isPollingInProgress = false;
     }
@@ -1238,11 +1219,6 @@
     if (visualizerSourceNode) {
       try { visualizerSourceNode.disconnect(); } catch (e) {}
       visualizerSourceNode = null;
-    }
-
-    if (remoteAudioSourceNode) {
-      try { remoteAudioSourceNode.disconnect(); } catch (e) {}
-      remoteAudioSourceNode = null;
     }
 
     if (iceBatchTimer) clearTimeout(iceBatchTimer);
@@ -1287,22 +1263,22 @@
     remoteAudio.pause();
     remoteAudio.srcObject = null;
 
-    bars.forEach(b => b.style.height = "2px");
+    bars.forEach(b => b.style.height = "3px");
     broadcasterCard.classList.remove("hidden");
     broadcastPreStart.classList.remove("hidden");
     broadcastControls.classList.add("hidden");
     listenerCountText.classList.add("hidden");
     listenerCard.classList.add("hidden");
     startBroadcastBtn.disabled = false;
-    myStationLabel.innerText = "Not Live";
+    myStationLabel.innerText = "Off-Air";
 
-    pauseBroadcastBtn.innerText = "Pause";
+    pauseBroadcastBtn.innerText = "Pause Broadcast";
     pauseBroadcastBtn.className = "";
-    muteBtn.innerText = "Mute Mic";
+    muteBtn.innerText = "Mute Microphone";
     muteBtn.className = "";
-    recordBroadcasterBtn.innerText = "Record";
+    recordBroadcasterBtn.innerText = "Record Audio";
     recordBroadcasterBtn.classList.remove("recording");
-    recordListenerBtn.innerText = "Record";
+    recordListenerBtn.innerText = "Record Stream";
     recordListenerBtn.classList.remove("recording");
 
     currentStationId = null;
