@@ -6,7 +6,7 @@
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <meta name="theme-color" content="#0d1117" />
-  <title>P2P Instant Stereo Radio v8</title>
+  <title>P2P Instant Stereo Radio v9 - Loudspeaker Edition</title>
   <style>
     :root {
       --bg: #0d1117;
@@ -152,7 +152,7 @@
       align-items: center;
     }
 
-    button {
+    button, select {
       min-height: 48px;
       min-width: 48px;
       background: #21262d;
@@ -169,6 +169,17 @@
       gap: 6px;
       transition: background 0.15s ease, transform 0.05s ease;
       user-select: none;
+    }
+
+    select {
+      flex: 1;
+      width: 100%;
+      outline: none;
+      -webkit-appearance: none;
+      background-image: url('data:image/svg+xml;utf8,<svg fill="%23c9d1d9" height="24" viewBox="0 0 24 24" width="24" xmlns="http://www.w3.org/2000/svg"><path d="M7 10l5 5 5-5z"/></svg>');
+      background-repeat: no-repeat;
+      background-position: right 12px center;
+      padding-right: 36px;
     }
 
     button:active:not(:disabled) {
@@ -273,6 +284,23 @@
       color: var(--warn);
       border-color: var(--warn);
     }
+
+    .speaker-section {
+      margin-top: 10px;
+      background: #0d1117;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 10px;
+    }
+
+    .speaker-section label {
+      display: block;
+      font-size: 0.7rem;
+      color: var(--muted);
+      text-transform: uppercase;
+      font-weight: 700;
+      margin-bottom: 6px;
+    }
   </style>
 </head>
 <body>
@@ -316,7 +344,16 @@
       <span>Tuned In: <strong id="currentStationTitle">Station</strong></span>
       <span class="badge live" id="stationStateBadge">LIVE</span>
     </div>
-    <div class="flex-row" style="margin-top: 8px; flex-wrap: wrap;">
+
+    <!-- Speaker Output Routing Section -->
+    <div class="speaker-section" id="speakerRoutingWrapper">
+      <label for="audioOutputSelect">🔊 Speaker Output Route</label>
+      <select id="audioOutputSelect">
+        <option value="default">Default Loudspeaker</option>
+      </select>
+    </div>
+
+    <div class="flex-row" style="margin-top: 10px; flex-wrap: wrap;">
       <button class="primary" id="listenerPlayPauseBtn" style="flex: 1 1 calc(50% - 4px);">Pause</button>
       <button id="listenerMuteBtn" style="flex: 1 1 calc(50% - 4px);">Mute</button>
       <button id="recordListenerBtn" style="flex: 1 1 calc(50% - 4px);">Record</button>
@@ -336,7 +373,7 @@
   </div>
 </div>
 
-<!-- Primary Stream Element -->
+<!-- Primary Stream Element configured for Loudspeaker projection -->
 <audio id="remoteAudio" autoplay playsinline></audio>
 
 <!-- Background Keep-Alive Audio Element for iOS Safari -->
@@ -377,13 +414,17 @@
   const iceCandidateBuffer = {};
   let iceBatchTimer = null;
 
-  // Audio Engine Lifecycle (Single Global Instance)
+  // Audio Engine Lifecycle
   let localAudioStream = null;
   let sharedAudioContext = null;
   let analyserNode = null;
   let visualizerSourceNode = null;
   let animFrameId = null;
   let lastSyncTimestamp = 0;
+
+  // Speaker Gain Pipeline
+  let speakerGainNode = null;
+  let remoteAudioSourceNode = null;
 
   // Dual-Layer Keep-Alive Oscillator & WakeLock
   let keepAliveOscillator = null;
@@ -435,6 +476,7 @@
   const listenerMuteBtn = document.getElementById("listenerMuteBtn");
   const recordListenerBtn = document.getElementById("recordListenerBtn");
   const tuneOutBtn = document.getElementById("tuneOutBtn");
+  const audioOutputSelect = document.getElementById("audioOutputSelect");
 
   // Build Visualizer UI
   const NUM_BARS = 24;
@@ -470,6 +512,51 @@
     }
     return sharedAudioContext;
   }
+
+  // ==========================================
+  // LOUDSPEAKER ROUTING & SELECTION ENGINE
+  // ==========================================
+  async function populateAudioOutputs() {
+    if (!navigator.mediaDevices || !navigator.mediaDevices.enumerateDevices) return;
+    try {
+      const devices = await navigator.mediaDevices.enumerateDevices();
+      const outputDevices = devices.filter(d => d.kind === 'audiooutput');
+
+      audioOutputSelect.innerHTML = '';
+
+      if (outputDevices.length === 0) {
+        const opt = document.createElement('option');
+        opt.value = 'default';
+        opt.innerText = 'Built-in Loudspeaker / Default Device';
+        audioOutputSelect.appendChild(opt);
+        return;
+      }
+
+      outputDevices.forEach(device => {
+        const option = document.createElement('option');
+        option.value = device.deviceId;
+        let label = device.label || `Speaker ${audioOutputSelect.length + 1}`;
+        if (label.toLowerCase().includes('speaker') || label.toLowerCase().includes('loudspeaker')) {
+          label = '🔊 ' + label;
+        }
+        option.innerText = label;
+        audioOutputSelect.appendChild(option);
+      });
+    } catch (e) {
+      console.warn("Could not enumerate audio output devices:", e);
+    }
+  }
+
+  audioOutputSelect.onchange = async () => {
+    const deviceId = audioOutputSelect.value;
+    if (typeof remoteAudio.setSinkId === 'function') {
+      try {
+        await remoteAudio.setSinkId(deviceId);
+      } catch (err) {
+        console.warn("setSinkId failed, default speaker active:", err);
+      }
+    }
+  };
 
   // ==========================================
   // 1. DUAL-LAYER KEEP-ALIVE & WAKELOCK
@@ -558,7 +645,6 @@
   signalingWorker.onmessage = async (e) => {
     if (e.data.type === 'tick') {
       await executePollCycle();
-      // Main thread triggers the next tick only after cycle finishes completely
       if (currentStationId) {
         signalingWorker.postMessage({ action: 'schedule_next', interval: targetPollInterval });
       }
@@ -659,13 +745,10 @@
     }
   }
 
-  // =======================================================
-  // ZERO-DESTINATION VISUALIZER (Eliminates CPU Loop / Hang)
-  // =======================================================
+  // Visualizer Pipeline with Zero-Destination Routing
   function initVisualizer(stream) {
     const ctx = getOrCreateAudioContext();
 
-    // Clean up any previously attached source to prevent node leakage
     if (visualizerSourceNode) {
       try { visualizerSourceNode.disconnect(); } catch (e) {}
       visualizerSourceNode = null;
@@ -678,8 +761,6 @@
 
     try {
       visualizerSourceNode = ctx.createMediaStreamSource(stream);
-      // STRICT REQUIREMENT: Connect ONLY to the analyser.
-      // NEVER connect visualizerSourceNode or analyserNode to ctx.destination!
       visualizerSourceNode.connect(analyserNode);
     } catch (e) {
       console.warn("Visualizer node setup bypassed:", e);
@@ -879,7 +960,7 @@
   }
 
   // ==========================================
-  // 4. LISTENER ACTIONS & INSTANT TUNE-IN
+  // 4. LISTENER ACTIONS & LOUDSPEAKER INITIALIZATION
   // ==========================================
   async function fetchStations() {
     refreshStationsBtn.disabled = true;
@@ -917,8 +998,21 @@
   refreshStationsBtn.onclick = fetchStations;
 
   window.tuneIntoStation = async (stationId, broadcaster, isStereo) => {
+    // 1. Prime Web Audio and native Audio context for media playback
     getOrCreateAudioContext();
     remoteAudio.play().catch(() => {});
+
+    // 2. Discover and configure output device list
+    await populateAudioOutputs();
+
+    // 3. Default explicitly to Loudspeaker output if supported by browser
+    if (typeof remoteAudio.setSinkId === 'function') {
+      try {
+        await remoteAudio.setSinkId('');
+      } catch (err) {
+        console.warn("Loudspeaker default sink assignment bypassed:", err);
+      }
+    }
 
     activateKeepAlive(stationId);
 
@@ -954,11 +1048,15 @@
 
     listenerPeerConnection.ontrack = (event) => {
       if (event.streams && event.streams[0]) {
-        // Direct stream to the HTML5 audio element for native playback
-        remoteAudio.srcObject = event.streams[0];
+        const stream = event.streams[0];
+        remoteAudio.srcObject = stream;
+        
+        // Force volume to maximum for loudspeaker projection
+        remoteAudio.volume = 1.0;
         remoteAudio.play().catch(() => {});
-        // Wire into passive non-rendering visualizer
-        initVisualizer(event.streams[0]);
+
+        // Wire into zero-destination frequency visualizer
+        initVisualizer(stream);
       }
     };
 
@@ -972,8 +1070,7 @@
       const st = listenerPeerConnection.iceConnectionState;
       if (st === "checking") setStatus("connecting", "Connecting...");
       if (st === "connected" || st === "completed") {
-        setStatus("live", "Tuned In");
-        // Back off worker pull frequency once media stream is locked in
+        setStatus("live", "Tuned In (Loudspeaker)");
         targetPollInterval = 4000;
       }
       if (["disconnected", "failed", "closed"].includes(st)) {
@@ -1045,7 +1142,6 @@
       if (res && res.status === "success") {
         lastSyncTimestamp = res.serverTime;
 
-        // Broadcaster Inbound Handling
         if (activeRole === "broadcaster") {
           if (res.newListeners && res.newListeners.length > 0) {
             for (const item of res.newListeners) {
@@ -1073,7 +1169,6 @@
           }
         }
 
-        // Listener Inbound Handling
         if (activeRole === "listener") {
           if (res.stationState === "station_paused") {
             stationStateBadge.innerText = "PAUSED";
@@ -1143,6 +1238,11 @@
     if (visualizerSourceNode) {
       try { visualizerSourceNode.disconnect(); } catch (e) {}
       visualizerSourceNode = null;
+    }
+
+    if (remoteAudioSourceNode) {
+      try { remoteAudioSourceNode.disconnect(); } catch (e) {}
+      remoteAudioSourceNode = null;
     }
 
     if (iceBatchTimer) clearTimeout(iceBatchTimer);
