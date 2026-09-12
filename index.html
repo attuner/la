@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>P2P Instant Stereo Radio</title>
+  <title>P2P Instant Stereo Radio v5</title>
   <style>
     :root {
       --bg: #0d1117;
@@ -37,7 +37,7 @@
     @keyframes pulse { from { opacity: 0.3; } to { opacity: 1; } }
 
     .card { background: #0d1117; border: 1px solid var(--border); border-radius: 8px; padding: 16px; margin-bottom: 16px; }
-    .group-label { font-size: 0.75rem; color: var(--muted); text-transform: uppercase; margin-bottom: 8px; font-weight: 600; display: flex; justify-content: space-between; }
+    .group-label { font-size: 0.75rem; color: var(--muted); text-transform: uppercase; margin-bottom: 8px; font-weight: 600; display: flex; justify-content: space-between; align-items: center; }
     .flex-row { display: flex; gap: 8px; align-items: center; }
     
     input[type="text"] { flex: 1; background: #161b22; border: 1px solid var(--border); border-radius: 6px; padding: 8px 12px; color: var(--text); font-size: 0.9rem; outline: none; }
@@ -79,7 +79,7 @@
     </div>
   </header>
 
-  <!-- Section 1: Broadcaster Transmitter Deck -->
+  <!-- Broadcaster Transmitter Deck -->
   <div class="card" id="broadcasterCard">
     <div class="group-label">
       <span>Broadcast Transmitter Deck</span>
@@ -101,7 +101,7 @@
     </div>
   </div>
 
-  <!-- Section 2: Listener Player Deck -->
+  <!-- Listener Player Deck -->
   <div class="card hidden" id="listenerCard">
     <div class="group-label">
       <span>Tuned In: <strong id="currentStationTitle">Station</strong></span>
@@ -115,7 +115,7 @@
     </div>
   </div>
 
-  <!-- Section 3: Instant Live Directory -->
+  <!-- Instant Live Directory -->
   <div class="card">
     <div class="group-label">
       <span>Live Radio Stations</span>
@@ -133,6 +133,7 @@
 <script>
   /**
    * CONFIGURATION
+   * Paste your active Google Apps Script Web App URL below:
    */
   const GAS_SIGNALING_URL = "https://script.google.com/macros/s/AKfycbzXZKXYms6i2L9G30PATMmf4A0cG4V57EiMHb2NvbJRfqioPCHxXKyvJIX8PXj5t-Ll/exec";
 
@@ -143,14 +144,14 @@
     ]
   };
 
-  // Persistent Transparent Identity
+  // Persistent Transparent User Identity
   let currentUser = localStorage.getItem("p2p_radio_user");
   if (!currentUser) {
     currentUser = "user_" + Math.random().toString(36).substring(2, 8);
     localStorage.setItem("p2p_radio_user", currentUser);
   }
 
-  // State Management
+  // Session State
   let currentStationId = null;
   let activeRole = null; // 'broadcaster' | 'listener'
   let targetBroadcaster = null;
@@ -164,22 +165,26 @@
   let audioContext = null;
   let analyserNode = null;
   let animFrameId = null;
-  let signalingTimer = null;
   let lastSyncTimestamp = 0;
 
-  // Broadcaster states
+  // Concurrency Guards
+  let isPollingActive = false;
+  let pollTimeoutId = null;
+  let activePollInterval = 500;
+
+  // Broadcaster States
   let isMicMuted = false;
   let isBroadcastPaused = false;
   let broadcasterRecorder = null;
   let broadcasterRecordedChunks = [];
 
-  // Listener states
+  // Listener States
   let isRemoteMuted = false;
   let isPlaybackPaused = false;
   let listenerRecorder = null;
   let listenerRecordedChunks = [];
 
-  // DOM Handles
+  // DOM Elements
   const statusDot = document.getElementById("statusDot");
   const statusText = document.getElementById("statusText");
   const channelBadge = document.getElementById("channelBadge");
@@ -188,7 +193,7 @@
   const remoteAudio = document.getElementById("remoteAudio");
   const visualizerContainer = document.getElementById("visualizer");
 
-  // Broadcaster DOM
+  // Broadcaster DOM Elements
   const broadcasterCard = document.getElementById("broadcasterCard");
   const broadcastPreStart = document.getElementById("broadcastPreStart");
   const broadcastControls = document.getElementById("broadcastControls");
@@ -201,7 +206,7 @@
   const listenerCountText = document.getElementById("listenerCountText");
   const listenerCountDisplay = document.getElementById("listenerCount");
 
-  // Listener DOM
+  // Listener DOM Elements
   const listenerCard = document.getElementById("listenerCard");
   const currentStationTitle = document.getElementById("currentStationTitle");
   const stationStateBadge = document.getElementById("stationStateBadge");
@@ -210,7 +215,7 @@
   const recordListenerBtn = document.getElementById("recordListenerBtn");
   const tuneOutBtn = document.getElementById("tuneOutBtn");
 
-  // Visualizer Bars
+  // Visualizer Bars Generation
   const NUM_BARS = 24;
   const bars = [];
   for (let i = 0; i < NUM_BARS; i++) {
@@ -235,33 +240,45 @@
   }
 
   // ==========================================
-  // 1. FAST-TURNAROUND NETWORKING CLIENT
+  // 1. ROBUST SIGNALING API CLIENT
   // ==========================================
-  async function apiCall(action, payload = {}) {
+  async function apiCall(action, payload = {}, retries = 2) {
     const body = { action, username: currentUser, ...payload };
     const formData = new URLSearchParams();
     for (const key in body) {
       if (typeof body[key] === "object") {
         formData.append(key, JSON.stringify(body[key]));
       } else {
-        formData.append(key, body[key] || "");
+        formData.append(key, body[key] !== undefined ? body[key] : "");
       }
     }
 
-    try {
-      const res = await fetch(GAS_SIGNALING_URL, {
-        method: "POST",
-        headers: { "Content-Type": "application/x-www-form-urlencoded" },
-        body: formData.toString()
-      });
-      return await res.json();
-    } catch (err) {
-      console.warn("API request failure:", err);
-      return { status: "error", message: err.toString() };
+    for (let attempt = 0; attempt <= retries; attempt++) {
+      try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 6000); // 6s network cutoff
+
+        const res = await fetch(GAS_SIGNALING_URL, {
+          method: "POST",
+          headers: { "Content-Type": "application/x-www-form-urlencoded" },
+          body: formData.toString(),
+          signal: controller.signal
+        });
+        clearTimeout(timeoutId);
+
+        const data = await res.json();
+        return data;
+      } catch (err) {
+        if (attempt === retries) {
+          console.warn(`Signaling action "${action}" failed:`, err);
+          return { status: "error", message: err.toString() };
+        }
+        await new Promise(r => setTimeout(r, 400));
+      }
     }
   }
 
-  // SDP Opus Stereo Modifier
+  // SDP Opus Stereo Inserter
   function forceStereoSDP(sdp) {
     return sdp.replace(/a=fmtp:111 ((?:(?!minptime).)*)\r\n/g, (match, p1) => {
       let params = p1;
@@ -271,7 +288,7 @@
     });
   }
 
-  // Audio Context & Hardware Setup
+  // Audio Context & Visualizer Pipeline
   function initVisualizer(stream) {
     if (!audioContext) {
       audioContext = new (window.AudioContext || window.webkitAudioContext)();
@@ -297,25 +314,28 @@
     render();
   }
 
-  // ==========================================
-  // 2. DUAL-MIC STEREO CAPTURE
-  // ==========================================
+  // Dual-Mic Stereo Capture with Resilient Fallback
   async function captureMicrophone() {
     if (!localAudioStream) {
-      // Request dual-mic hardware stereo capture constraints
-      localAudioStream = await navigator.mediaDevices.getUserMedia({
-        audio: {
-          channelCount: 2,
-          echoCancellation: false,
-          autoGainControl: false,
-          noiseSuppression: false
-        },
-        video: false
-      });
+      try {
+        localAudioStream = await navigator.mediaDevices.getUserMedia({
+          audio: {
+            channelCount: 2,
+            echoCancellation: false,
+            autoGainControl: false,
+            noiseSuppression: false
+          },
+          video: false
+        });
+      } catch (e) {
+        // Fallback to standard mono capture if dual-channel is rejected by hardware
+        console.warn("Hardware stereo constraints rejected, falling back to default mic:", e);
+        localAudioStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+      }
 
       const track = localAudioStream.getAudioTracks()[0];
       const settings = track.getSettings ? track.getSettings() : {};
-      isStereoHardware = (settings.channelCount && settings.channelCount >= 2);
+      isStereoHardware = !!(settings.channelCount && settings.channelCount >= 2);
       setChannelBadge(isStereoHardware);
       initVisualizer(localAudioStream);
     }
@@ -323,7 +343,7 @@
   }
 
   // ==========================================
-  // 3. BROADCASTER WORKFLOW
+  // 2. BROADCASTER ACTIONS
   // ==========================================
   startBroadcastBtn.onclick = async () => {
     let stationName = stationNameInput.value.trim();
@@ -333,13 +353,15 @@
       if (!stationName) return;
     }
 
+    startBroadcastBtn.disabled = true;
     try {
       await captureMicrophone();
     } catch (e) {
+      startBroadcastBtn.disabled = false;
       return alert("Microphone access failed: " + e.message);
     }
 
-    currentStationId = "station_" + stationName.replace(/\s+/g, '_');
+    currentStationId = "station_" + stationName.replace(/[^a-zA-Z0-9_-]/g, '_');
     activeRole = "broadcaster";
 
     broadcastPreStart.classList.add("hidden");
@@ -347,11 +369,14 @@
     listenerCountText.classList.remove("hidden");
     setStatus("live", "On-Air");
 
-    await apiCall("start_station", { stationId: currentStationId, isStereo: isStereoHardware });
-    startSignalingLoop(500); // Fast initial polling during handshake
+    const res = await apiCall("start_station", { stationId: currentStationId, isStereo: isStereoHardware });
+    if (res.status !== "success") {
+      alert("Unable to register station: " + res.message);
+      return resetSessionState();
+    }
+    startDynamicPolling(500);
   };
 
-  // Pause / Resume Broadcast
   pauseBroadcastBtn.onclick = async () => {
     if (!localAudioStream) return;
     isBroadcastPaused = !isBroadcastPaused;
@@ -367,7 +392,6 @@
     });
   };
 
-  // Mute / Unmute Mic
   muteBtn.onclick = () => {
     if (!localAudioStream) return;
     isMicMuted = !isMicMuted;
@@ -376,7 +400,6 @@
     muteBtn.className = isMicMuted ? "danger" : "";
   };
 
-  // Broadcaster Local MediaRecording (Zero-Retention: Memory Only)
   recordBroadcasterBtn.onclick = () => {
     if (!localAudioStream) return;
     if (broadcasterRecorder && broadcasterRecorder.state === "recording") {
@@ -409,6 +432,10 @@
   };
 
   async function setupBroadcasterPeer(listenerUser) {
+    if (broadcasterPeerConnections[listenerUser]) {
+      broadcasterPeerConnections[listenerUser].close();
+    }
+
     const pc = new RTCPeerConnection(RTC_CONFIG);
     broadcasterPeerConnections[listenerUser] = pc;
 
@@ -451,12 +478,15 @@
   }
 
   // ==========================================
-  // 4. LISTENER WORKFLOW (Instant Tune-In)
+  // 3. LISTENER ACTIONS & TUNE-IN
   // ==========================================
   async function fetchStations() {
+    refreshStationsBtn.disabled = true;
     const res = await apiCall("list_stations");
-    if (res.status === "success") {
-      if (res.stations.length === 0) {
+    refreshStationsBtn.disabled = false;
+
+    if (res && res.status === "success") {
+      if (!res.stations || res.stations.length === 0) {
         stationList.innerHTML = "<li><span>No stations live currently</span></li>";
       } else {
         stationList.innerHTML = res.stations
@@ -479,12 +509,15 @@
             `;
           }).join("");
       }
+    } else {
+      stationList.innerHTML = "<li><span style='color: var(--warn);'>Could not load stations. Retrying...</span></li>";
+      setTimeout(fetchStations, 3000);
     }
   }
   refreshStationsBtn.onclick = fetchStations;
 
   window.tuneIntoStation = async (stationId, broadcaster, isStereo) => {
-    // Synchronously unlock mobile/desktop audio engine
+    // Immediate audio engine unlock for Safari & Chrome autoplay compliance
     if (!audioContext) {
       audioContext = new (window.AudioContext || window.webkitAudioContext)();
     }
@@ -503,15 +536,15 @@
     setChannelBadge(isStereo);
     setStatus("signaling", "Tuning in...");
 
-    // Immediate tune-in handshake call
-    const res = await apiCall("tune_in", { stationId });
-    if (res.status !== "success") {
-      alert(res.message);
+    // Send instant tune-in intent
+    const res = await apiCall("tune_in", { stationId: currentStationId });
+    if (!res || res.status !== "success") {
+      alert("Tune-in failed: " + (res ? res.message : "Network error"));
       return resetSessionState();
     }
 
     setupListenerPeerConnection(broadcaster);
-    startSignalingLoop(450); // Rapid dynamic polling during connection setup
+    startDynamicPolling(450); // High-speed dynamic loop during initial handshake
   };
 
   function setupListenerPeerConnection(broadcaster) {
@@ -539,14 +572,14 @@
       if (st === "checking") setStatus("connecting", "Negotiating...");
       if (st === "connected" || st === "completed") {
         setStatus("live", "Tuned In");
-        // Dynamically throttle polling back to 2000ms after handshake establishes
-        startSignalingLoop(2000);
+        startDynamicPolling(2000); // Handshake complete, throttle back to 2000ms
       }
-      if (["disconnected", "failed", "closed"].includes(st)) setStatus("", "Disconnected");
+      if (["disconnected", "failed", "closed"].includes(st)) {
+        setStatus("", "Disconnected");
+      }
     };
   }
 
-  // Listener Player Controls
   listenerPlayPauseBtn.onclick = () => {
     isPlaybackPaused = !isPlaybackPaused;
     if (isPlaybackPaused) {
@@ -565,7 +598,6 @@
     listenerMuteBtn.className = isRemoteMuted ? "danger" : "";
   };
 
-  // Listener Local MediaRecording (Zero-Retention: Memory Only)
   recordListenerBtn.onclick = () => {
     if (!remoteAudio.srcObject) return alert("No active audio stream to record.");
     if (listenerRecorder && listenerRecorder.state === "recording") {
@@ -598,90 +630,102 @@
   };
 
   // ==========================================
-  // 5. RAPID DYNAMIC POLLING SIGNALING ENGINE
+  // 4. NON-OVERLAPPING DYNAMIC SIGNALING ENGINE
   // ==========================================
-  function startSignalingLoop(intervalMs) {
-    if (signalingTimer) clearInterval(signalingTimer);
-    signalingTimer = setInterval(async () => {
+  function startDynamicPolling(intervalMs) {
+    activePollInterval = intervalMs;
+    if (pollTimeoutId) clearTimeout(pollTimeoutId);
+
+    const runPollCycle = async () => {
       if (!currentStationId) return;
+      if (isPollingActive) {
+        pollTimeoutId = setTimeout(runPollCycle, activePollInterval);
+        return;
+      }
 
-      const res = await apiCall("poll_signaling", { stationId: currentStationId, since: lastSyncTimestamp });
-      if (res.status === "success") {
-        lastSyncTimestamp = res.serverTime;
+      isPollingActive = true;
+      try {
+        const res = await apiCall("poll_signaling", { stationId: currentStationId, since: lastSyncTimestamp });
+        if (res && res.status === "success") {
+          lastSyncTimestamp = res.serverTime;
 
-        // Broadcaster Processing
-        if (activeRole === "broadcaster") {
-          // Detect Incoming Listeners
-          if (res.newListeners && res.newListeners.length > 0) {
-            for (const item of res.newListeners) {
-              const listener = item.listener;
-              if (!broadcasterPeerConnections[listener]) {
-                await setupBroadcasterPeer(listener);
+          // Broadcaster Pipeline
+          if (activeRole === "broadcaster") {
+            if (res.newListeners && res.newListeners.length > 0) {
+              for (const item of res.newListeners) {
+                const listener = item.listener;
+                if (!broadcasterPeerConnections[listener]) {
+                  await setupBroadcasterPeer(listener);
+                }
+              }
+            }
+            if (res.answers && res.answers.length > 0) {
+              for (const item of res.answers) {
+                const pc = broadcasterPeerConnections[item.from];
+                if (pc && pc.signalingState === "have-local-offer") {
+                  await pc.setRemoteDescription(new RTCSessionDescription(item.payload));
+                }
+              }
+            }
+            if (res.ice && res.ice.length > 0) {
+              for (const item of res.ice) {
+                const pc = broadcasterPeerConnections[item.from];
+                if (pc) {
+                  try { await pc.addIceCandidate(new RTCIceCandidate(item.candidate)); } catch (e) {}
+                }
               }
             }
           }
-          // Process SDP Answers
-          if (res.answers && res.answers.length > 0) {
-            for (const item of res.answers) {
-              const pc = broadcasterPeerConnections[item.from];
-              if (pc && pc.signalingState === "have-local-offer") {
-                await pc.setRemoteDescription(new RTCSessionDescription(item.payload));
+
+          // Listener Pipeline
+          if (activeRole === "listener") {
+            if (res.stationState === "station_paused") {
+              stationStateBadge.innerText = "PAUSED";
+              stationStateBadge.className = "badge paused";
+            } else {
+              stationStateBadge.innerText = "LIVE";
+              stationStateBadge.className = "badge live";
+            }
+
+            if (res.offers && res.offers.length > 0) {
+              for (const item of res.offers) {
+                if (item.from === targetBroadcaster && listenerPeerConnection && listenerPeerConnection.signalingState === "stable") {
+                  await listenerPeerConnection.setRemoteDescription(new RTCSessionDescription(item.payload));
+                  const rawAnswer = await listenerPeerConnection.createAnswer();
+                  const stereoAnswer = new RTCSessionDescription({
+                    type: rawAnswer.type,
+                    sdp: forceStereoSDP(rawAnswer.sdp)
+                  });
+                  await listenerPeerConnection.setLocalDescription(stereoAnswer);
+                  await apiCall("post_answer", {
+                    stationId: currentStationId,
+                    toUser: targetBroadcaster,
+                    payload: stereoAnswer
+                  });
+                }
               }
             }
-          }
-          // Process Listener ICE Candidates
-          if (res.ice && res.ice.length > 0) {
-            for (const item of res.ice) {
-              const pc = broadcasterPeerConnections[item.from];
-              if (pc) {
-                try { await pc.addIceCandidate(new RTCIceCandidate(item.candidate)); } catch (e) {}
+
+            if (res.ice && res.ice.length > 0) {
+              for (const item of res.ice) {
+                if (item.from === targetBroadcaster && listenerPeerConnection) {
+                  try { await listenerPeerConnection.addIceCandidate(new RTCIceCandidate(item.candidate)); } catch (e) {}
+                }
               }
             }
           }
         }
-
-        // Listener Processing
-        if (activeRole === "listener") {
-          // Monitor Station Host Pause/Live State
-          if (res.stationState === "station_paused") {
-            stationStateBadge.innerText = "PAUSED";
-            stationStateBadge.className = "badge paused";
-          } else {
-            stationStateBadge.innerText = "LIVE";
-            stationStateBadge.className = "badge live";
-          }
-
-          // Process SDP Offer
-          if (res.offers && res.offers.length > 0) {
-            for (const item of res.offers) {
-              if (item.from === targetBroadcaster && listenerPeerConnection.signalingState === "stable") {
-                await listenerPeerConnection.setRemoteDescription(new RTCSessionDescription(item.payload));
-                const rawAnswer = await listenerPeerConnection.createAnswer();
-                const stereoAnswer = new RTCSessionDescription({
-                  type: rawAnswer.type,
-                  sdp: forceStereoSDP(rawAnswer.sdp)
-                });
-                await listenerPeerConnection.setLocalDescription(stereoAnswer);
-                await apiCall("post_answer", {
-                  stationId: currentStationId,
-                  toUser: targetBroadcaster,
-                  payload: stereoAnswer
-                });
-              }
-            }
-          }
-
-          // Process Broadcaster ICE Candidates
-          if (res.ice && res.ice.length > 0) {
-            for (const item of res.ice) {
-              if (item.from === targetBroadcaster) {
-                try { await listenerPeerConnection.addIceCandidate(new RTCIceCandidate(item.candidate)); } catch (e) {}
-              }
-            }
-          }
+      } catch (err) {
+        console.warn("Poll cycle warning:", err);
+      } finally {
+        isPollingActive = false;
+        if (currentStationId) {
+          pollTimeoutId = setTimeout(runPollCycle, activePollInterval);
         }
       }
-    }, intervalMs);
+    };
+
+    pollTimeoutId = setTimeout(runPollCycle, 50);
   }
 
   // Teardown
@@ -689,8 +733,9 @@
   tuneOutBtn.onclick = resetSessionState;
 
   async function resetSessionState() {
-    if (signalingTimer) clearInterval(signalingTimer);
+    if (pollTimeoutId) clearTimeout(pollTimeoutId);
     if (animFrameId) cancelAnimationFrame(animFrameId);
+    isPollingActive = false;
 
     if (broadcasterRecorder && broadcasterRecorder.state === "recording") broadcasterRecorder.stop();
     if (listenerRecorder && listenerRecorder.state === "recording") listenerRecorder.stop();
@@ -724,6 +769,7 @@
     broadcastControls.classList.add("hidden");
     listenerCountText.classList.add("hidden");
     listenerCard.classList.add("hidden");
+    startBroadcastBtn.disabled = false;
 
     pauseBroadcastBtn.innerText = "Pause Broadcast";
     pauseBroadcastBtn.className = "";
@@ -748,7 +794,7 @@
     fetchStations();
   }
 
-  // Initial Scan on Load
+  // Scan on Load
   window.addEventListener("load", () => {
     fetchStations();
   });
