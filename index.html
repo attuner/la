@@ -6,7 +6,7 @@
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <meta name="theme-color" content="#0d1117" />
-  <title>P2P Instant Stereo Radio v7</title>
+  <title>P2P Instant Stereo Radio v8</title>
   <style>
     :root {
       --bg: #0d1117;
@@ -367,20 +367,21 @@
   let activeRole = null; // 'broadcaster' | 'listener'
   let targetBroadcaster = null;
   let isStereoHardware = false;
-  let hasNotifiedTuneIn = false; // Guard to guarantee tune_in single-fire
+  let hasNotifiedTuneIn = false;
 
   // Multi-Listener Pool & Listener Connection
   const broadcasterPeerConnections = {};
   let listenerPeerConnection = null;
 
-  // ICE Buffers for Batch Transmission: { [targetUser]: Candidate[] }
+  // ICE Buffers for Batch Transmission
   const iceCandidateBuffer = {};
   let iceBatchTimer = null;
 
-  // Media & Hardware
+  // Audio Engine Lifecycle (Single Global Instance)
   let localAudioStream = null;
-  let audioContext = null;
+  let sharedAudioContext = null;
   let analyserNode = null;
+  let visualizerSourceNode = null;
   let animFrameId = null;
   let lastSyncTimestamp = 0;
 
@@ -399,6 +400,9 @@
   let isPlaybackPaused = false;
   let listenerRecorder = null;
   let listenerRecordedChunks = [];
+
+  // Adaptive Worker Interval State
+  let targetPollInterval = 1200;
 
   // DOM Elements
   const statusDot = document.getElementById("statusDot");
@@ -456,8 +460,19 @@
     }
   }
 
+  function getOrCreateAudioContext() {
+    if (!sharedAudioContext) {
+      const AudioCtx = window.AudioContext || window.webkitAudioContext;
+      sharedAudioContext = new AudioCtx();
+    }
+    if (sharedAudioContext.state === "suspended") {
+      sharedAudioContext.resume().catch(() => {});
+    }
+    return sharedAudioContext;
+  }
+
   // ==========================================
-  // 1. DUAL-LAYER KEEP-ALIVE & WAKELOCK STACK
+  // 1. DUAL-LAYER KEEP-ALIVE & WAKELOCK
   // ==========================================
   async function requestScreenWakeLock() {
     if ('wakeLock' in navigator) {
@@ -470,7 +485,7 @@
   }
 
   document.addEventListener("visibilitychange", async () => {
-    if (document.visibilityState === 'visible' && (currentStationId)) {
+    if (document.visibilityState === 'visible' && currentStationId) {
       if (wakeLockSentinel !== null) {
         await requestScreenWakeLock();
       }
@@ -478,33 +493,24 @@
   });
 
   function activateKeepAlive(stationTitle) {
-    // 1. HTML5 Silent Audio loop
     silentKeepAlive.play().catch(() => {});
 
-    // 2. Continuous Inaudible Tone via Web Audio Oscillator
     try {
-      if (!audioContext) {
-        audioContext = new (window.AudioContext || window.webkitAudioContext)();
-      }
-      if (audioContext.state === "suspended") {
-        audioContext.resume();
-      }
+      const ctx = getOrCreateAudioContext();
       if (!keepAliveOscillator) {
-        keepAliveOscillator = audioContext.createOscillator();
-        const silentGain = audioContext.createGain();
-        silentGain.gain.value = 0.0001; // Inaudible to human ear
+        keepAliveOscillator = ctx.createOscillator();
+        const silentGain = ctx.createGain();
+        silentGain.gain.value = 0.0001;
         keepAliveOscillator.connect(silentGain);
-        silentGain.connect(audioContext.destination);
+        silentGain.connect(ctx.destination);
         keepAliveOscillator.start();
       }
     } catch (e) {
       console.warn("Keep-alive oscillator skipped:", e);
     }
 
-    // 3. Screen Wake Lock
     requestScreenWakeLock();
 
-    // 4. MediaSession Daemon Registration
     if ('mediaSession' in navigator) {
       navigator.mediaSession.metadata = new MediaMetadata({
         title: stationTitle ? stationTitle.replace('station_', '') : 'Live Transmission',
@@ -530,16 +536,19 @@
   }
 
   // ==========================================
-  // 2. CONCURRENCY-LOCKED BACKGROUND WORKER
+  // 2. PULL-BASED WORKER SCHEDULER
   // ==========================================
   const workerBlobCode = `
     let timer = null;
     self.onmessage = function(e) {
-      if (e.data.action === 'start') {
-        if (timer) clearInterval(timer);
-        timer = setInterval(() => self.postMessage({ type: 'tick' }), e.data.interval || 1200);
-      } else if (e.data.action === 'stop') {
-        if (timer) clearInterval(timer);
+      const data = e.data;
+      if (data.action === 'schedule_next') {
+        if (timer) clearTimeout(timer);
+        timer = setTimeout(() => {
+          self.postMessage({ type: 'tick' });
+        }, data.interval || 1200);
+      } else if (data.action === 'stop') {
+        if (timer) clearTimeout(timer);
         timer = null;
       }
     };
@@ -549,11 +558,16 @@
   signalingWorker.onmessage = async (e) => {
     if (e.data.type === 'tick') {
       await executePollCycle();
+      // Main thread triggers the next tick only after cycle finishes completely
+      if (currentStationId) {
+        signalingWorker.postMessage({ action: 'schedule_next', interval: targetPollInterval });
+      }
     }
   };
 
   function startSignalingWorker(intervalMs) {
-    signalingWorker.postMessage({ action: 'start', interval: intervalMs });
+    targetPollInterval = intervalMs;
+    signalingWorker.postMessage({ action: 'schedule_next', interval: 50 });
   }
 
   function stopSignalingWorker() {
@@ -603,7 +617,7 @@
     iceCandidateBuffer[targetUser].push(candidate);
 
     if (!iceBatchTimer) {
-      iceBatchTimer = setTimeout(flushIceCandidateBuffers, 400); // 400ms aggregation
+      iceBatchTimer = setTimeout(flushIceCandidateBuffers, 400);
     }
   }
 
@@ -645,35 +659,56 @@
     }
   }
 
-  // Visualizer Pipeline with Tab Visibility Throttling
+  // =======================================================
+  // ZERO-DESTINATION VISUALIZER (Eliminates CPU Loop / Hang)
+  // =======================================================
   function initVisualizer(stream) {
-    if (!audioContext) {
-      audioContext = new (window.AudioContext || window.webkitAudioContext)();
-    }
-    if (audioContext.state === "suspended") {
-      audioContext.resume();
-    }
-    analyserNode = audioContext.createAnalyser();
-    analyserNode.fftSize = 64;
-    const src = audioContext.createMediaStreamSource(stream);
-    src.connect(analyserNode);
+    const ctx = getOrCreateAudioContext();
 
-    const dataArray = new Uint8Array(analyserNode.frequencyBinCount);
-    function render() {
-      // Throttle completely if window is hidden to prevent main-thread freeze
-      if (document.hidden) {
+    // Clean up any previously attached source to prevent node leakage
+    if (visualizerSourceNode) {
+      try { visualizerSourceNode.disconnect(); } catch (e) {}
+      visualizerSourceNode = null;
+    }
+
+    if (!analyserNode) {
+      analyserNode = ctx.createAnalyser();
+      analyserNode.fftSize = 64;
+    }
+
+    try {
+      visualizerSourceNode = ctx.createMediaStreamSource(stream);
+      // STRICT REQUIREMENT: Connect ONLY to the analyser.
+      // NEVER connect visualizerSourceNode or analyserNode to ctx.destination!
+      visualizerSourceNode.connect(analyserNode);
+    } catch (e) {
+      console.warn("Visualizer node setup bypassed:", e);
+      return;
+    }
+
+    if (!animFrameId) {
+      const dataArray = new Uint8Array(analyserNode.frequencyBinCount);
+      function render() {
+        if (!currentStationId) {
+          animFrameId = null;
+          return;
+        }
+
+        if (document.hidden) {
+          animFrameId = requestAnimationFrame(render);
+          return;
+        }
+
+        analyserNode.getByteFrequencyData(dataArray);
+        for (let i = 0; i < NUM_BARS; i++) {
+          const val = dataArray[i] || 0;
+          const pct = Math.min(100, Math.max(5, (val / 255) * 100));
+          bars[i].style.height = pct + "%";
+        }
         animFrameId = requestAnimationFrame(render);
-        return;
-      }
-      analyserNode.getByteFrequencyData(dataArray);
-      for (let i = 0; i < NUM_BARS; i++) {
-        const val = dataArray[i] || 0;
-        const pct = Math.min(100, Math.max(5, (val / 255) * 100));
-        bars[i].style.height = pct + "%";
       }
       animFrameId = requestAnimationFrame(render);
     }
-    render();
   }
 
   async function captureMicrophone() {
@@ -705,7 +740,7 @@
   }
 
   // ==========================================
-  // 3. INSTANT BROADCAST (No Modal / No Prompt)
+  // 3. BROADCASTER ACTIONS
   // ==========================================
   startBroadcastBtn.onclick = async () => {
     startBroadcastBtn.disabled = true;
@@ -717,7 +752,6 @@
       return alert("Microphone access failed: " + e.message);
     }
 
-    // Derive stationId immediately from persistent session user identity
     currentStationId = "station_" + currentUser;
     activeRole = "broadcaster";
     myStationLabel.innerText = currentUser;
@@ -734,7 +768,7 @@
       alert("Unable to register station: " + res.message);
       return resetSessionState();
     }
-    startSignalingWorker(1200); // Safe minimum polling threshold
+    startSignalingWorker(1200);
   };
 
   pauseBroadcastBtn.onclick = async () => {
@@ -883,13 +917,7 @@
   refreshStationsBtn.onclick = fetchStations;
 
   window.tuneIntoStation = async (stationId, broadcaster, isStereo) => {
-    // Unlock Web Audio and Remote Playback
-    if (!audioContext) {
-      audioContext = new (window.AudioContext || window.webkitAudioContext)();
-    }
-    if (audioContext.state === "suspended") {
-      audioContext.resume();
-    }
+    getOrCreateAudioContext();
     remoteAudio.play().catch(() => {});
 
     activateKeepAlive(stationId);
@@ -904,7 +932,6 @@
     setChannelBadge(isStereo);
     setStatus("signaling", "Tuning in...");
 
-    // Guaranteed single-fire presence registration
     if (!hasNotifiedTuneIn) {
       hasNotifiedTuneIn = true;
       const res = await apiCall("tune_in", { stationId: currentStationId });
@@ -916,7 +943,7 @@
     }
 
     setupListenerPeerConnection(broadcaster);
-    startSignalingWorker(1200); // 1.2s initial handshake rate
+    startSignalingWorker(1200);
   };
 
   function setupListenerPeerConnection(broadcaster) {
@@ -927,8 +954,10 @@
 
     listenerPeerConnection.ontrack = (event) => {
       if (event.streams && event.streams[0]) {
+        // Direct stream to the HTML5 audio element for native playback
         remoteAudio.srcObject = event.streams[0];
         remoteAudio.play().catch(() => {});
+        // Wire into passive non-rendering visualizer
         initVisualizer(event.streams[0]);
       }
     };
@@ -944,8 +973,8 @@
       if (st === "checking") setStatus("connecting", "Connecting...");
       if (st === "connected" || st === "completed") {
         setStatus("live", "Tuned In");
-        // Connection settled: throttle worker down to conserve network/main-thread
-        startSignalingWorker(4000);
+        // Back off worker pull frequency once media stream is locked in
+        targetPollInterval = 4000;
       }
       if (["disconnected", "failed", "closed"].includes(st)) {
         setStatus("", "Disconnected");
@@ -1003,9 +1032,9 @@
   };
 
   // ==========================================
-  // 5. CONCURRENCY-LOCKED ASYNC SIGNALING LOOP
+  // 5. SEQUENTIAL PULL-BASED SIGNALING CYCLE
   // ==========================================
-  let isPollingInProgress = false; // Strict Lockout Guard
+  let isPollingInProgress = false;
 
   async function executePollCycle() {
     if (!currentStationId || isPollingInProgress) return;
@@ -1016,7 +1045,7 @@
       if (res && res.status === "success") {
         lastSyncTimestamp = res.serverTime;
 
-        // Broadcaster Inbound Pipeline
+        // Broadcaster Inbound Handling
         if (activeRole === "broadcaster") {
           if (res.newListeners && res.newListeners.length > 0) {
             for (const item of res.newListeners) {
@@ -1044,7 +1073,7 @@
           }
         }
 
-        // Listener Inbound Pipeline
+        // Listener Inbound Handling
         if (activeRole === "listener") {
           if (res.stationState === "station_paused") {
             stationStateBadge.innerText = "PAUSED";
@@ -1090,7 +1119,7 @@
         }
       }
     } catch (err) {
-      console.warn("Poll cycle exception:", err);
+      console.warn("Signaling poll encountered exception:", err);
     } finally {
       isPollingInProgress = false;
     }
@@ -1102,21 +1131,28 @@
 
   async function resetSessionState() {
     stopSignalingWorker();
-    if (animFrameId) cancelAnimationFrame(animFrameId);
     isPollingInProgress = false;
     hasNotifiedTuneIn = false;
+    targetPollInterval = 1200;
 
-    // Flush any remaining ICE buffers
+    if (animFrameId) {
+      cancelAnimationFrame(animFrameId);
+      animFrameId = null;
+    }
+
+    if (visualizerSourceNode) {
+      try { visualizerSourceNode.disconnect(); } catch (e) {}
+      visualizerSourceNode = null;
+    }
+
     if (iceBatchTimer) clearTimeout(iceBatchTimer);
     iceBatchTimer = null;
 
-    // Release WakeLock
     if (wakeLockSentinel !== null) {
       try { await wakeLockSentinel.release(); } catch (e) {}
       wakeLockSentinel = null;
     }
 
-    // Terminate inaudible keep-alive oscillator
     if (keepAliveOscillator) {
       try { keepAliveOscillator.stop(); } catch (e) {}
       keepAliveOscillator = null;
