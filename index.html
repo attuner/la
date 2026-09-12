@@ -1,697 +1,224 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" class="dark">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-  <meta name="apple-mobile-web-app-capable" content="yes" />
-  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-  <title>Serverless P2P Audio Intercom</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>AirWave P2P — Live Audio Broadcasting</title>
+  <!-- Tailwind CSS via CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            brand: { 500: '#6366f1', 600: '#4f46e5', 700: '#4338ca' }
+          }
+        }
+      }
+    }
+  </script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"/>
   <style>
-    :root {
-      --bg: #0b0f19;
-      --card-bg: rgba(23, 32, 54, 0.75);
-      --border: rgba(255, 255, 255, 0.08);
-      --accent: #3b82f6;
-      --accent-hover: #2563eb;
-      --accent-glow: rgba(59, 130, 246, 0.4);
-      --danger: #ef4444;
-      --danger-hover: #dc2626;
-      --success: #10b981;
-      --warning: #f59e0b;
-      --text: #f3f4f6;
-      --text-muted: #9ca3af;
-      --font: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-    }
-
-    * {
-      box-sizing: border-box;
-      margin: 0;
-      padding: 0;
-      -webkit-tap-highlight-color: transparent;
-    }
-
-    body {
-      font-family: var(--font);
-      background: radial-gradient(circle at 50% 10%, #172554, var(--bg) 80%);
-      color: var(--text);
-      min-height: 100vh;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      padding: 1rem;
-      overflow-x: hidden;
-    }
-
-    .container {
-      width: 100%;
-      max-width: 480px;
-      background: var(--card-bg);
-      backdrop-filter: blur(16px);
-      -webkit-backdrop-filter: blur(16px);
-      border: 1px solid var(--border);
-      border-radius: 24px;
-      padding: 1.75rem;
-      box-shadow: 0 20px 40px rgba(0, 0, 0, 0.6);
-      display: flex;
-      flex-direction: column;
-      gap: 1.25rem;
-    }
-
-    header {
-      text-align: center;
-    }
-
-    header h1 {
-      font-size: 1.5rem;
-      font-weight: 700;
-      letter-spacing: -0.02em;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: 0.5rem;
-    }
-
-    header p {
-      font-size: 0.85rem;
-      color: var(--text-muted);
-      margin-top: 0.25rem;
-    }
-
-    /* Status Pill */
-    .status-wrapper {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      background: rgba(0, 0, 0, 0.3);
-      padding: 0.75rem 1rem;
-      border-radius: 12px;
-      border: 1px solid var(--border);
-    }
-
-    .status-badge {
-      display: flex;
-      align-items: center;
-      gap: 0.5rem;
-      font-size: 0.85rem;
-      font-weight: 600;
-    }
-
-    .status-dot {
-      width: 10px;
-      height: 10px;
-      border-radius: 50%;
-      background: var(--text-muted);
-      transition: background 0.3s ease, box-shadow 0.3s ease;
-    }
-
-    .status-dot.connecting {
-      background: var(--warning);
-      box-shadow: 0 0 10px var(--warning);
-    }
-
-    .status-dot.connected {
-      background: var(--success);
-      box-shadow: 0 0 10px var(--success);
-    }
-
-    .status-dot.error {
-      background: var(--danger);
-      box-shadow: 0 0 10px var(--danger);
-    }
-
-    .client-id {
-      font-size: 0.75rem;
-      color: var(--text-muted);
-      font-family: monospace;
-    }
-
-    /* Controls & Forms */
-    .form-group {
-      display: flex;
-      flex-direction: column;
-      gap: 0.5rem;
-    }
-
-    label {
-      font-size: 0.8rem;
-      font-weight: 600;
-      text-transform: uppercase;
-      letter-spacing: 0.05em;
-      color: var(--text-muted);
-    }
-
-    input[type="text"] {
-      width: 100%;
-      background: rgba(0, 0, 0, 0.4);
-      border: 1px solid var(--border);
-      color: var(--text);
-      padding: 0.85rem 1rem;
-      border-radius: 12px;
-      font-size: 1rem;
-      outline: none;
-      transition: border-color 0.2s;
-    }
-
-    input[type="text"]:focus {
-      border-color: var(--accent);
-    }
-
-    .button-group {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 0.75rem;
-    }
-
-    button {
-      font-family: var(--font);
-      font-size: 0.95rem;
-      font-weight: 600;
-      padding: 0.85rem 1rem;
-      border-radius: 12px;
-      border: none;
-      cursor: pointer;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: 0.5rem;
-      transition: all 0.2s ease;
-    }
-
-    button:active {
-      transform: scale(0.98);
-    }
-
-    button:disabled {
-      opacity: 0.5;
-      cursor: not-allowed;
-      transform: none;
-    }
-
-    .btn-primary {
-      background: var(--accent);
-      color: white;
-      box-shadow: 0 4px 14px var(--accent-glow);
-    }
-
-    .btn-primary:hover:not(:disabled) {
-      background: var(--accent-hover);
-    }
-
-    .btn-danger {
-      background: var(--danger);
-      color: white;
-    }
-
-    .btn-danger:hover:not(:disabled) {
-      background: var(--danger-hover);
-    }
-
-    .btn-secondary {
-      background: rgba(255, 255, 255, 0.1);
-      color: var(--text);
-    }
-
-    .btn-secondary:hover:not(:disabled) {
-      background: rgba(255, 255, 255, 0.18);
-    }
-
-    /* Audio Visualizer */
-    .visualizer-container {
-      background: rgba(0, 0, 0, 0.4);
-      border: 1px solid var(--border);
-      border-radius: 14px;
-      height: 70px;
-      width: 100%;
-      overflow: hidden;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      position: relative;
-    }
-
-    canvas {
-      width: 100%;
-      height: 100%;
-    }
-
-    /* Diagnostics Log Drawer */
-    .log-container {
-      background: #060911;
-      border: 1px solid var(--border);
-      border-radius: 10px;
-      padding: 0.75rem;
-      font-family: monospace;
-      font-size: 0.75rem;
-      height: 100px;
-      overflow-y: auto;
-      color: #7dd3fc;
-      line-height: 1.4;
-    }
-
-    .log-container p {
-      margin-bottom: 2px;
-      word-break: break-all;
-    }
-
-    .log-container p.err {
-      color: #f87171;
-    }
-
-    .log-container p.warn {
-      color: #fbbf24;
-    }
-
-    /* Hidden elements */
-    .hidden {
-      display: none !important;
-    }
+    .glow { box-shadow: 0 0 20px -5px rgba(99, 102, 241, 0.4); }
+    canvas { filter: drop-shadow(0 0 8px rgba(99, 102, 241, 0.5)); }
   </style>
 </head>
-<body>
+<body class="bg-slate-950 text-slate-100 min-h-screen font-sans antialiased flex flex-col">
 
-  <div class="container">
-    <header>
-      <h1>🎙️ P2P Intercom</h1>
-      <p>Low-Latency Direct Peer-to-Peer Audio</p>
-    </header>
-
-    <!-- Status Bar -->
-    <div class="status-wrapper">
-      <div class="status-badge">
-        <span class="status-dot" id="statusDot"></span>
-        <span id="statusLabel">Disconnected</span>
+  <!-- Header -->
+  <header class="border-b border-slate-800 bg-slate-900/60 backdrop-blur sticky top-0 z-40">
+    <div class="max-w-6xl mx-auto px-4 h-16 flex items-center justify-between">
+      <div class="flex items-center space-x-3">
+        <div class="w-9 h-9 rounded-xl bg-indigo-600 flex items-center justify-center text-white font-bold shadow-lg shadow-indigo-500/30">
+          <i class="fa-solid fa-tower-broadcast"></i>
+        </div>
+        <span class="text-xl font-black tracking-tight text-white">Air<span class="text-indigo-500">Wave</span></span>
       </div>
-      <span class="client-id" id="peerIdDisplay">ID: ------</span>
-    </div>
 
-    <!-- Pre-Call Setup Form -->
-    <div id="setupForm" class="form-group">
-      <label for="roomInput">Room Name</label>
-      <input type="text" id="roomInput" placeholder="e.g. kitchen-room" value="live-test" />
+      <div class="flex items-center space-x-4">
+        <div id="userBadge" class="hidden items-center space-x-2 bg-slate-800/80 px-3 py-1.5 rounded-full border border-slate-700 text-sm">
+          <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+          <span id="displayUsername" class="font-medium">Guest</span>
+        </div>
+        <button id="btnSettings" class="text-slate-400 hover:text-white transition p-2">
+          <i class="fa-solid fa-gear"></i>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Container -->
+  <main class="max-w-6xl mx-auto px-4 py-8 flex-1 w-full space-y-8">
+    
+    <!-- Toast Message Container -->
+    <div id="toastContainer" class="fixed bottom-4 right-4 z-50 flex flex-col gap-2"></div>
+
+    <!-- Onboarding Section (Auth Sim) -->
+    <section id="onboardingSection" class="max-w-md mx-auto my-12 bg-slate-900 border border-slate-800 p-8 rounded-2xl glow shadow-2xl">
+      <div class="text-center space-y-2 mb-6">
+        <h2 class="text-2xl font-bold">Welcome to AirWave</h2>
+        <p class="text-sm text-slate-400">Zero-backend serverless live peer-to-peer audio.</p>
+      </div>
+      <form id="joinForm" class="space-y-4">
+        <div>
+          <label class="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Display Name</label>
+          <input id="usernameInput" type="text" required placeholder="e.g. Alex Rivera" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-2.5 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none text-white placeholder-slate-500 transition" />
+        </div>
+        <div>
+          <label class="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Google Apps Script Web App URL</label>
+          <input id="apiUrlInput" type="url" required placeholder="https://script.google.com/macros/s/.../exec" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-2.5 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none text-white placeholder-slate-500 transition text-xs font-mono" />
+        </div>
+        <button type="submit" class="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-semibold py-3 rounded-xl transition shadow-lg shadow-indigo-600/30">
+          Enter Space
+        </button>
+      </form>
+    </section>
+
+    <!-- Main Workspace (Hidden by Default) -->
+    <div id="appWorkspace" class="hidden space-y-8">
       
-      <div class="button-group" style="margin-top: 0.5rem;">
-        <button id="btnJoinHost" class="btn-primary">
-          <span>Host (Offer)</span>
-        </button>
-        <button id="btnJoinGuest" class="btn-secondary">
-          <span>Join (Answer)</span>
+      <!-- Top Action Bar -->
+      <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-slate-900/40 p-4 border border-slate-800 rounded-2xl">
+        <div>
+          <h1 class="text-xl font-bold text-white">Live Audio Spaces</h1>
+          <p class="text-sm text-slate-400">Discover broadcast rooms or host your own channel.</p>
+        </div>
+        <button id="btnOpenBroadcastModal" class="bg-indigo-600 hover:bg-indigo-500 text-white font-medium px-5 py-2.5 rounded-xl shadow-lg shadow-indigo-500/20 flex items-center space-x-2 transition">
+          <i class="fa-solid fa-tower-broadcast"></i>
+          <span>Go Live</span>
         </button>
       </div>
+
+      <!-- Broadcaster Console Panel -->
+      <div id="broadcasterConsole" class="hidden bg-slate-900 border border-indigo-500/30 rounded-2xl p-6 glow relative overflow-hidden">
+        <div class="flex flex-col md:flex-row gap-6 items-start md:items-center justify-between border-b border-slate-800 pb-6">
+          <div class="space-y-1">
+            <div class="flex items-center space-x-2">
+              <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-bold bg-red-500/10 text-red-400 border border-red-500/20">
+                <span class="w-1.5 h-1.5 rounded-full bg-red-500 animate-ping mr-1.5"></span> LIVE ON AIR
+              </span>
+              <span id="broadcastCategoryBadge" class="text-xs bg-slate-800 px-2 py-0.5 rounded text-slate-400">Tech</span>
+            </div>
+            <h2 id="broadcastTitleDisplay" class="text-2xl font-bold text-white tracking-tight">Audio Room Title</h2>
+            <div class="text-xs text-slate-400 flex items-center space-x-4">
+              <span><i class="fa-solid fa-users text-indigo-400 mr-1"></i> <span id="listenerCount">0</span> listeners connected</span>
+              <span><i class="fa-solid fa-clock text-indigo-400 mr-1"></i> <span id="broadcastTimer">00:00</span></span>
+            </div>
+          </div>
+
+          <!-- Controls -->
+          <div class="flex items-center space-x-3 w-full md:w-auto justify-end">
+            <button id="btnToggleMute" class="bg-slate-800 hover:bg-slate-700 text-white w-12 h-12 rounded-xl flex items-center justify-center transition border border-slate-700">
+              <i class="fa-solid fa-microphone"></i>
+            </button>
+            <button id="btnEndBroadcast" class="bg-red-600/90 hover:bg-red-600 text-white px-5 py-3 rounded-xl font-medium transition shadow-lg shadow-red-600/20 flex items-center space-x-2">
+              <i class="fa-solid fa-phone-slash"></i>
+              <span>End Stream</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Visualizer & Hardware Config -->
+        <div class="mt-6 grid grid-cols-1 md:grid-cols-3 gap-6 items-center">
+          <div class="md:col-span-2 bg-slate-950 rounded-xl p-4 border border-slate-800/80">
+            <div class="flex justify-between text-xs text-slate-400 mb-2">
+              <span>Audio Level Visualizer</span>
+              <span id="audioInputLabel" class="truncate max-w-[200px]">Default Mic</span>
+            </div>
+            <canvas id="visualizerCanvas" width="600" height="70" class="w-full h-16 rounded"></canvas>
+          </div>
+          <div class="bg-slate-950 rounded-xl p-4 border border-slate-800/80 space-y-2">
+            <label class="block text-xs font-semibold text-slate-400 uppercase tracking-wider">Audio Source</label>
+            <select id="audioSourceSelect" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-indigo-500"></select>
+          </div>
+        </div>
+      </div>
+
+      <!-- Listener Active Player Deck (Docked Player) -->
+      <div id="listenerDeck" class="hidden bg-slate-900 border border-indigo-500/40 rounded-2xl p-5 shadow-2xl space-y-4">
+        <div class="flex flex-col sm:flex-row justify-between sm:items-center gap-4">
+          <div class="flex items-center space-x-4">
+            <div class="w-12 h-12 rounded-xl bg-indigo-600/20 border border-indigo-500/30 flex items-center justify-center text-indigo-400 text-lg">
+              <i class="fa-solid fa-headphones-simple animate-pulse"></i>
+            </div>
+            <div>
+              <span id="listenerRoomBadge" class="text-xs font-bold text-indigo-400 uppercase tracking-wide">Listening Now</span>
+              <h3 id="listenerRoomTitle" class="text-lg font-bold text-white">Stream Name</h3>
+              <p id="listenerPeerStatus" class="text-xs text-slate-400">Connecting to P2P mesh...</p>
+            </div>
+          </div>
+
+          <div class="flex items-center space-x-4 w-full sm:w-auto">
+            <!-- Audio Output element for WebRTC -->
+            <audio id="remoteAudioPlayer" autoplay></audio>
+            
+            <div class="flex items-center space-x-2 flex-1 sm:w-36">
+              <i class="fa-solid fa-volume-high text-xs text-slate-400"></i>
+              <input id="volumeSlider" type="range" min="0" max="1" step="0.05" value="1" class="w-full h-1.5 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-indigo-500">
+            </div>
+
+            <button id="btnLeaveStream" class="bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white px-4 py-2 rounded-xl text-sm font-medium border border-slate-700 transition">
+              Leave
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Live Stream Directory -->
+      <div class="space-y-4">
+        <div class="flex items-center justify-between">
+          <h2 class="text-lg font-bold text-slate-200">Active Broadcasts</h2>
+          <button id="btnManualRefresh" class="text-xs text-slate-400 hover:text-indigo-400 flex items-center space-x-1">
+            <i class="fa-solid fa-arrows-rotate"></i>
+            <span>Refresh</span>
+          </button>
+        </div>
+
+        <div id="roomsGrid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          <!-- Dynamically populates with room cards -->
+        </div>
+
+        <div id="noRoomsPlaceholder" class="text-center py-16 border border-dashed border-slate-800 rounded-2xl bg-slate-900/20">
+          <div class="w-12 h-12 rounded-full bg-slate-800 mx-auto flex items-center justify-center text-slate-400 mb-3">
+            <i class="fa-solid fa-radio"></i>
+          </div>
+          <h3 class="text-base font-semibold text-white">No active streams</h3>
+          <p class="text-sm text-slate-500 mt-1 max-w-sm mx-auto">Be the first to take the stage and broadcast audio to peers worldwide.</p>
+        </div>
+      </div>
+
     </div>
+  </main>
 
-    <!-- Active Call UI -->
-    <div id="callControls" class="form-group hidden">
-      <div class="visualizer-container">
-        <canvas id="visualizer"></canvas>
+  <!-- Modal: Broadcast Configuration -->
+  <div id="broadcastModal" class="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+    <div class="bg-slate-900 border border-slate-800 rounded-2xl max-w-md w-full p-6 space-y-5 shadow-2xl">
+      <div class="flex justify-between items-center border-b border-slate-800 pb-3">
+        <h3 class="text-lg font-bold text-white">Setup Audio Space</h3>
+        <button id="btnCloseModal" class="text-slate-400 hover:text-white text-lg"><i class="fa-solid fa-xmark"></i></button>
       </div>
-
-      <div class="button-group">
-        <button id="btnMute" class="btn-secondary">
-          <span id="muteLabel">Mute Mic</span>
+      <form id="startBroadcastForm" class="space-y-4">
+        <div>
+          <label class="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Space Title</label>
+          <input id="streamTitleInput" type="text" required placeholder="e.g. Modern Web Architecture Breakdown" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-2.5 text-white outline-none focus:border-indigo-500 text-sm" />
+        </div>
+        <div>
+          <label class="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Topic Category</label>
+          <select id="streamCategoryInput" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-2.5 text-white outline-none focus:border-indigo-500 text-sm">
+            <option value="Tech">Tech & Coding</option>
+            <option value="Music">Music & Chill</option>
+            <option value="Education">Education & AMA</option>
+            <option value="Casual">Casual Chat</option>
+          </select>
+        </div>
+        <button type="submit" class="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-medium py-3 rounded-xl transition shadow-lg shadow-indigo-600/30">
+          Go Live Now
         </button>
-        <button id="btnHangup" class="btn-danger">
-          <span>End Call</span>
-        </button>
-      </div>
-    </div>
-
-    <!-- Live Diagnostics Log Box -->
-    <div class="form-group">
-      <label>Connection Logs</label>
-      <div class="log-container" id="logBox"></div>
+      </form>
     </div>
   </div>
 
-  <!-- Audio Element (playsinline handles Safari/iOS policies) -->
-  <audio id="remoteAudio" autoplay playsinline></audio>
-
-  <script>
-    /**
-     * CONFIGURATION
-     * Replace with your deployed Google Apps Script Web App URL
-     */
-    const SIGNALING_URL = "https://script.google.com/macros/s/AKfycbzyn1l0hNm63RPVCN0iJD-vkW73qP-xzn6qHQOZ3agRWQdaBSm5LU66DVNGWv_D4fN5/exec";
-
-    // STUN Servers provided free by Google
-    const RTC_CONFIG = {
-      iceServers: [
-        { urls: "stun:stun.l.google.com:19302" },
-        { urls: "stun:stun1.l.google.com:19302" }
-      ]
-    };
-
-    // State Variables
-    const peerId = "usr_" + Math.random().toString(36).substring(2, 9);
-    let roomId = "";
-    let isInitiator = false;
-    let peerConnection = null;
-    let localStream = null;
-    let pollingInterval = null;
-    let lastPollTimestamp = 0;
-    let isMuted = false;
-    let audioContext = null;
-    let animationId = null;
-
-    // DOM Elements
-    const statusDot = document.getElementById("statusDot");
-    const statusLabel = document.getElementById("statusLabel");
-    const peerIdDisplay = document.getElementById("peerIdDisplay");
-    const setupForm = document.getElementById("setupForm");
-    const callControls = document.getElementById("callControls");
-    const roomInput = document.getElementById("roomInput");
-    const btnJoinHost = document.getElementById("btnJoinHost");
-    const btnJoinGuest = document.getElementById("btnJoinGuest");
-    const btnMute = document.getElementById("btnMute");
-    const btnHangup = document.getElementById("btnHangup");
-    const muteLabel = document.getElementById("muteLabel");
-    const logBox = document.getElementById("logBox");
-    const canvas = document.getElementById("visualizer");
-    const canvasCtx = canvas.getContext("2d");
-    const remoteAudio = document.getElementById("remoteAudio");
-
-    peerIdDisplay.innerText = `ID: ${peerId}`;
-
-    // Append diagnostics to the screen
-    function log(msg, type = "info") {
-      const p = document.createElement("p");
-      p.className = type;
-      p.textContent = `[${new Date().toLocaleTimeString()}] ${msg}`;
-      logBox.appendChild(p);
-      logBox.scrollTop = logBox.scrollHeight;
-    }
-
-    function setStatus(text, statusClass) {
-      statusLabel.textContent = text;
-      statusDot.className = `status-dot ${statusClass}`;
-    }
-
-    /**
-     * iOS Safari Audio Unlock
-     * Requires explicit AudioContext activation & element priming on user click
-     */
-    function unlockAudioForSafari() {
-      const AudioCtx = window.AudioContext || window.webkitAudioContext;
-      if (!audioContext && AudioCtx) {
-        audioContext = new AudioCtx();
-      }
-      if (audioContext && audioContext.state === "suspended") {
-        audioContext.resume();
-      }
-      // Play a short silent buffer to register active sound playback gesture
-      remoteAudio.play().then(() => {
-        remoteAudio.pause();
-        remoteAudio.currentTime = 0;
-      }).catch(() => {
-        // Expected if track is not yet assigned; gesture is registered regardless
-      });
-    }
-
-    /**
-     * Setup Audio Capture & Canvas Visualizer
-     */
-    async function startMicrophone() {
-      // Modern constraints prioritized for speech and low delay
-      const constraints = {
-        audio: {
-          echoCancellation: true,
-          noiseSuppression: true,
-          autoGainControl: true,
-          latency: 0
-        },
-        video: false
-      };
-
-      try {
-        localStream = await navigator.mediaDevices.getUserMedia(constraints);
-        log("Microphone access authorized.");
-        setupVisualizer(localStream);
-        return true;
-      } catch (err) {
-        log(`Microphone Error: ${err.message}`, "err");
-        alert("Could not access microphone. Ensure permissions are granted and page is on HTTPS.");
-        return false;
-      }
-    }
-
-    function setupVisualizer(stream) {
-      if (!audioContext) {
-        const AudioCtx = window.AudioContext || window.webkitAudioContext;
-        audioContext = new AudioCtx();
-      }
-      
-      const source = audioContext.createMediaStreamSource(stream);
-      const analyser = audioContext.createAnalyser();
-      analyser.fftSize = 64;
-      source.connect(analyser);
-
-      const bufferLength = analyser.frequencyBinCount;
-      const dataArray = new Uint8Array(bufferLength);
-
-      function draw() {
-        animationId = requestAnimationFrame(draw);
-        analyser.getByteFrequencyData(dataArray);
-
-        canvas.width = canvas.parentElement.offsetWidth;
-        canvas.height = canvas.parentElement.offsetHeight;
-
-        canvasCtx.fillStyle = "rgba(6, 9, 17, 0.5)";
-        canvasCtx.fillRect(0, 0, canvas.width, canvas.height);
-
-        const barWidth = (canvas.width / bufferLength) * 2;
-        let x = 0;
-
-        for (let i = 0; i < bufferLength; i++) {
-          const barHeight = (dataArray[i] / 255) * canvas.height;
-          canvasCtx.fillStyle = `rgb(59, ${130 + dataArray[i] / 2}, 246)`;
-          canvasCtx.fillRect(x, canvas.height - barHeight, barWidth - 2, barHeight);
-          x += barWidth;
-        }
-      }
-      draw();
-    }
-
-    /**
-     * Google Apps Script Mailbox Signaling
-     */
-    async function sendSignal(type, payload, targetId = "all") {
-      try {
-        await fetch(SIGNALING_URL, {
-          method: "POST",
-          headers: { "Content-Type": "text/plain;charset=utf-8" },
-          body: JSON.stringify({
-            action: "send",
-            roomId: roomId,
-            senderId: peerId,
-            targetId: targetId,
-            type: type,
-            payload: payload
-          }),
-          redirect: "follow"
-        });
-      } catch (err) {
-        log(`Failed to send ${type}: ${err.message}`, "err");
-      }
-    }
-
-    function startSignalingPolling() {
-      // Poll every 1200ms during initial handshake
-      pollingInterval = setInterval(async () => {
-        try {
-          const url = `${SIGNALING_URL}?action=poll&roomId=${encodeURIComponent(roomId)}&peerId=${encodeURIComponent(peerId)}&since=${lastPollTimestamp}`;
-          const res = await fetch(url, { method: "GET", redirect: "follow" });
-          const data = await res.json();
-
-          if (data.status === "success" && data.messages) {
-            data.messages.forEach(msg => {
-              handleIncomingSignal(msg);
-              if (msg.timestamp > lastPollTimestamp) {
-                lastPollTimestamp = msg.timestamp;
-              }
-            });
-          }
-        } catch (e) {
-          // Suppress transient read failures during background polling
-        }
-      }, 1200);
-    }
-
-    function stopSignalingPolling() {
-      if (pollingInterval) {
-        clearInterval(pollingInterval);
-        pollingInterval = null;
-      }
-    }
-
-    /**
-     * WebRTC Connection Setup
-     */
-    function createPeerConnection() {
-      peerConnection = new RTCPeerConnection(RTC_CONFIG);
-
-      // Add local audio tracks to peer connection
-      localStream.getAudioTracks().forEach(track => {
-        peerConnection.addTrack(track, localStream);
-      });
-
-      // Handle candidate exchange
-      peerConnection.onicecandidate = (event) => {
-        if (event.candidate) {
-          sendSignal("candidate", event.candidate);
-        }
-      };
-
-      // Handle remote audio stream arrival
-      peerConnection.ontrack = (event) => {
-        log("Direct audio stream received from peer.");
-        remoteAudio.srcObject = event.streams[0];
-        remoteAudio.play().catch(e => {
-          log(`Autoplay blocked: ${e.message}. Tap screen to unlock.`, "warn");
-        });
-      };
-
-      // Handle connection status changes
-      peerConnection.oniceconnectionstatechange = () => {
-        const state = peerConnection.iceConnectionState;
-        log(`ICE State: ${state}`);
-        if (state === "connected" || state === "completed") {
-          setStatus("Connected (P2P)", "connected");
-          // Turn off signaling mailbox polling once direct P2P is established to save sheet bandwidth
-          stopSignalingPolling();
-        } else if (state === "disconnected" || state === "failed" || state === "closed") {
-          setStatus("Disconnected", "error");
-        } else if (state === "checking") {
-          setStatus("Verifying P2P...", "connecting");
-        }
-      };
-    }
-
-    /**
-     * Signal Dispatcher
-     */
-    async function handleIncomingSignal(msg) {
-      const { type, payload } = msg;
-
-      if (!peerConnection && type !== "offer" && type !== "join") return;
-
-      try {
-        if (type === "join" && isInitiator) {
-          log("Peer entered the room. Building offer...");
-          const offer = await peerConnection.createOffer({
-            offerToReceiveAudio: true,
-            voiceActivityDetection: true
-          });
-          await peerConnection.setLocalDescription(offer);
-          await sendSignal("offer", offer);
-        } 
-        else if (type === "offer" && !isInitiator) {
-          log("Offer received. Replying with answer...");
-          await peerConnection.setRemoteDescription(new RTCSessionDescription(payload));
-          const answer = await peerConnection.createAnswer();
-          await peerConnection.setLocalDescription(answer);
-          await sendSignal("answer", answer);
-        } 
-        else if (type === "answer" && isInitiator) {
-          log("Answer received from peer.");
-          if (peerConnection.signalingState !== "stable") {
-            await peerConnection.setRemoteDescription(new RTCSessionDescription(payload));
-          }
-        } 
-        else if (type === "candidate") {
-          if (payload && peerConnection) {
-            await peerConnection.addIceCandidate(new RTCIceCandidate(payload));
-          }
-        }
-      } catch (err) {
-        log(`Signal handling error: ${err.message}`, "err");
-      }
-    }
-
-    /**
-     * Start Call Orchestration
-     */
-    async function initiateCall(asHost) {
-      unlockAudioForSafari();
-      roomId = roomInput.value.trim().toLowerCase();
-
-      if (!roomId) {
-        alert("Please specify a valid Room Name.");
-        return;
-      }
-
-      if (SIGNALING_URL.includes("YOUR_GOOGLE_APPS_SCRIPT_WEB_APP_URL")) {
-        alert("Error: Update SIGNALING_URL in the script tag with your deployed Apps Script URL.");
-        return;
-      }
-
-      const micGranted = await startMicrophone();
-      if (!micGranted) return;
-
-      isInitiator = asHost;
-      setupForm.classList.add("hidden");
-      callControls.classList.remove("hidden");
-      setStatus("Signaling...", "connecting");
-
-      createPeerConnection();
-      lastPollTimestamp = Date.now();
-      startSignalingPolling();
-
-      if (isInitiator) {
-        log(`Hosting room "${roomId}". Waiting for peer...`);
-      } else {
-        log(`Joining room "${roomId}" as guest...`);
-        // Notify host that guest has joined
-        await sendSignal("join", { ready: true });
-      }
-    }
-
-    // Call End / Teardown
-    function hangUp() {
-      stopSignalingPolling();
-
-      if (animationId) cancelAnimationFrame(animationId);
-
-      if (peerConnection) {
-        peerConnection.close();
-        peerConnection = null;
-      }
-
-      if (localStream) {
-        localStream.getTracks().forEach(track => track.stop());
-        localStream = null;
-      }
-
-      remoteAudio.srcObject = null;
-      setStatus("Disconnected", "");
-      setupForm.classList.remove("hidden");
-      callControls.classList.add("hidden");
-      log("Call terminated.");
-    }
-
-    // Toggle Mic Mute
-    function toggleMute() {
-      if (!localStream) return;
-      isMuted = !isMuted;
-      localStream.getAudioTracks().forEach(track => {
-        track.enabled = !isMuted;
-      });
-      muteLabel.innerText = isMuted ? "Unmute Mic" : "Mute Mic";
-      btnMute.className = isMuted ? "btn-danger" : "btn-secondary";
-      log(`Microphone ${isMuted ? "Muted" : "Active"}`);
-    }
-
-    // Event Listeners
-    btnJoinHost.addEventListener("click", () => initiateCall(true));
-    btnJoinGuest.addEventListener("click", () => initiateCall(false));
-    btnHangup.addEventListener("click", hangUp);
-    btnMute.addEventListener("click", toggleMute);
-
-    // Visibility management (re-awakens WebRTC streams on mobile tab change)
-    document.addEventListener("visibilitychange", () => {
-      if (document.visibilityState === "visible" && audioContext && audioContext.state === "suspended") {
-        audioContext.resume();
-      }
-    });
-  </script>
+  <script src="app.js"></script>
 </body>
 </html>
